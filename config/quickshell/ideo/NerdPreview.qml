@@ -109,6 +109,7 @@ Item {
           width: parent.width
           spacing: 8
           Text {
+            textFormat: Text.PlainText
             width: 70
             horizontalAlignment: Text.AlignRight
             text: modelData[0]

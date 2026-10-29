@@ -1128,6 +1128,7 @@ Item {
                 width: parent.width - 16
                 spacing: 3
                 Text {
+                  textFormat: Text.PlainText
                   width: parent.width
                   horizontalAlignment: Text.AlignHCenter
                   text: modelData[0]
@@ -1138,6 +1139,7 @@ Item {
                   font.letterSpacing: Zenon.labelSpacing
                 }
                 Text {
+                  textFormat: Text.PlainText
                   width: parent.width
                   horizontalAlignment: Text.AlignHCenter
                   elide: Text.ElideRight
@@ -1148,6 +1150,7 @@ Item {
                   font.pixelSize: Zenon.px(21)
                 }
                 Text {
+                  textFormat: Text.PlainText
                   width: parent.width
                   horizontalAlignment: Text.AlignHCenter
                   elide: Text.ElideRight
@@ -1382,6 +1385,7 @@ Item {
               }
             }
             Text {
+              textFormat: Text.PlainText
               width: shotFrame.width
               elide: Text.ElideRight
               text: shot.modelData.caption || ""
@@ -1491,6 +1495,7 @@ Item {
             font.pixelSize: Zenon.px(20)
           }
           Text {
+            textFormat: Text.PlainText
             text: parent.rel ? "Version " + parent.rel.version
               + (parent.rel.date ? "  ·  " + St.releaseDate(parent.rel.date) : "") : ""
             color: Zenon.accentMuted
@@ -1547,6 +1552,7 @@ Item {
                 width: (page.colW - facts.columnSpacing * (facts.columns - 1)) / facts.columns
                 spacing: 2
                 Text {
+                  textFormat: Text.PlainText
                   text: modelData[0]
                   color: Zenon.accentMuted
                   font.family: Zenon.face
@@ -1554,6 +1560,7 @@ Item {
                   font.pixelSize: Zenon.px(13)
                 }
                 Text {
+                  textFormat: Text.PlainText
                   width: parent.width
                   wrapMode: Text.Wrap
                   text: modelData[1]

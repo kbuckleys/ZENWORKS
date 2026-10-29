@@ -20,6 +20,9 @@
 #   4. qmllint against its baseline (scripts/lintgate.py) — what is new
 #   5. what the running shell has warned about since it last reloaded —
 #      runtime errors no compile can see
+#   6. Hyprland's config errors, and anything it calls deprecated (0.57's
+#      deprecated-config): a deprecation works today and breaks the next
+#      Hyprland, so it fails here while the fix is still one line
 #
 # All clear, it stamps what it ran on (scripts/stack.sh --stamp); Health
 # warns once Qt, quickshell or Hyprland have moved on from that.
@@ -124,6 +127,26 @@ qs log 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' \
   | grep -E 'WARN|ERROR' \
   | grep -vEf "$tmp/noise" \
   | sed 's/^/   /' | tail -15 || true
+
+# 6. Hyprland's own complaints about the Lua config (read-only queries).
+#    configerrors answers [""] when clean, so blank entries are dropped.
+echo "── Hyprland config errors and deprecations"
+if command -v hyprctl >/dev/null && [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
+  hyp=$( { hyprctl -j configerrors; printf '\n'; hyprctl -j deprecated-config; } 2>/dev/null \
+    | python3 -c 'import json,sys
+d=json.JSONDecoder(); t=sys.stdin.read().strip(); i=0; n=0
+for tag in ("error", "deprecated"):
+    while i < len(t) and t[i].isspace(): i += 1
+    try: a, i = d.raw_decode(t, i)
+    except ValueError: print("   unreadable"); n += 1; break
+    for x in a:
+        if str(x).strip(): print("   " + tag + ": " + str(x)); n += 1
+print("   none" if n == 0 else "")' )
+  printf '%s\n' "$hyp" | sed '/^$/d'
+  printf '%s' "$hyp" | grep -q '^   none$' || fail=1
+else
+  echo "   not in a Hyprland session: skipped"
+fi
 
 # all clear: what it ran on is stamped, and Oracle's Health says when Qt,
 # quickshell or Hyprland move on from it (scripts/stack.sh)

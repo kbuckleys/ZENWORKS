@@ -373,11 +373,13 @@ def route(op):
     return (FORGES[name], rest) if name in FORGES else None
 
 # Requests named here change the repository; they queue behind each other.
+# (fetchQuiet too: the 5-minute fetch writes refs, and beside a pull or a
+# rebase it was "cannot lock ref" — audit 2026-10-28d)
 WRITES = {"resolveBlocks", "ignore", "untrack", "stage", "stageAll", "unstage", "unstageAll", "discard", "clean",
           "stageLines", "unstageLines", "discardLines", "commit", "undoCommit",
           "branchCreate", "branchTrack", "switch", "branchDelete",
           "branchRename", "setUpstream", "tagCreate", "tagDelete",
-          "remoteAdd", "remoteRemove", "remoteSetUrl", "remoteRename", "fetch", "pull", "push",
+          "remoteAdd", "remoteRemove", "remoteSetUrl", "remoteRename", "fetch", "fetchQuiet", "pull", "push",
           "stashPush", "stashApply", "stashDrop", "stashBranch",
           "worktreeAdd", "worktreeRemove", "worktreePrune", "merge",
           "cherryPick", "revert", "rebase", "rebaseInteractive", "sequence",

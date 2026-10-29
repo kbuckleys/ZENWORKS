@@ -6,8 +6,8 @@
 // CHRONOS' CALENDAR WINDOW (user, 2026-10-28): Apple Calendar's shape, to
 // be refined — the toolbar (sidebar, +, Day · Week · Month · Year), the
 // month in bold and its year beside it with ‹ Today › across from them,
-// the calendars down the sidebar under the account they are from with a
-// small month at its foot. A timed event in a month is a dot, its title
+// the calendars down the sidebar, this computer's then the online
+// accounts' (each heading's + makes one), with a small month at its foot. A timed event in a month is a dot, its title
 // and its time; an all-day one a filled bar. Events open with a click and
 // are written whole in a sheet (when, repeats, an alert, where, notes);
 // online accounts in another. The sidebar makes room for itself as
@@ -133,6 +133,12 @@ FloatingWindow {
     if (i >= 0) h.splice(i, 1); else h.push(name);
     cw.mgr.set("hidden", h);
   }
+  // one calendar shown, every other hidden; again on the same one, all back
+  function onlyCal(name) {
+    const others = Chronos.calendars.map((c) => c.name).filter((n) => n !== name);
+    const alone = cw.settings.hidden.indexOf(name) < 0 && others.every((n) => cw.settings.hidden.indexOf(n) >= 0);
+    cw.mgr.set("hidden", alone ? [] : others);
+  }
   readonly property string firstShownCal: {
     const c = Chronos.calendars.find((x) => cw.settings.hidden.indexOf(x.name) < 0);
     return c ? c.name : (Chronos.calendars.length ? Chronos.calendars[0].name : "");
@@ -165,7 +171,8 @@ FloatingWindow {
   // many): the keys act on it
   property var selected: null
   // what a right click's menu is about while it is open, for its ring
-  // (terminus' HeldRing): "uid|date" of an event, or a calendar's name
+  // (terminus' HeldRing): "uid|date" of an event, a calendar's name, or
+  // "acct:" and an account's name
   readonly property var heldKey: menu.isOpen ? menu.held : null
   function select(ev) { cw.selected = ev && ev.uid ? { uid: ev.uid, date: ev.date, ev: ev } : null; }
   function isSelected(ev) { return !!ev && !!cw.selected && cw.selected.uid === ev.uid && cw.selected.date === ev.date; }
@@ -312,6 +319,39 @@ FloatingWindow {
     return cell ? Chr.isoDay(cell.y, cell.m, cell.d) : "";
   }
 
+  // a calendar's row: its box in its color, its menu on a right click
+  component CalRow: Item {
+    id: crow
+    // the window: an inline component cannot see its ids
+    property var win: null
+    required property var modelData
+    width: parent ? parent.width : 0
+    height: 28
+    Ctl.Check {
+      // on the heading's text edge (SideHead's x 15), not left of it
+      x: 15
+      anchors.verticalCenter: parent.verticalCenter
+      lit: !!crow.win && crow.win.settings.hidden.indexOf(crow.modelData.name) < 0
+      ink: crow.win ? crow.win.inkOf(crow.modelData.name) : Zenon.cyan
+      label: crow.modelData.title
+      textSize: Zenon.px(14)
+      onToggled: crow.win.toggleCal(crow.modelData.name)
+    }
+    // ringed while its menu is up (terminus' HeldRing)
+    HeldRing {
+      anchors.fill: parent
+      anchors.leftMargin: 9
+      anchors.rightMargin: 2
+      radius: Zenon.radiusControl
+      on: !!crow.win && crow.win.heldKey === crow.modelData.name
+    }
+    // its menu: rename, color, show or hide, delete
+    TapHandler {
+      acceptedButtons: Qt.RightButton
+      onTapped: (pt) => crow.win.calMenu(crow.modelData, crow, pt.position.x, pt.position.y)
+    }
+  }
+
   // ── CALENDARS OF YOUR OWN ──────────────────────────────────────────
   function isLocal(cal) { return Chr.groupOf(cal, Chronos.accounts) === ""; }
   function calMenu(cal, item, x, y) {
@@ -321,6 +361,7 @@ FloatingWindow {
       { text: "Color", icon: "\u{F03D8}", children: Chr.COLORS.map((c) => ({ text: c[1], icon: "\u{F012F}", iconInk: cw.colorOf(c[0]),
           run: () => Chronos.setCalendar(cal.name, cal.title, c[0], (j) => { if (j.error) cw.say(j.error, true); }) })) },
       { text: cw.settings.hidden.indexOf(cal.name) >= 0 ? "Show" : "Hide", icon: "\u{F0208}", run: () => cw.toggleCal(cal.name) },
+      { text: "Show only this", icon: "\u{F0208}", run: () => cw.onlyCal(cal.name) },
       { isSeparator: true },
       { text: "New calendar…", icon: "\u{F0415}", run: () => cw.calForm(null) },
     ].concat(cw.isLocal(cal) ? [{ text: "Delete…", icon: "\u{F09E7}", danger: true, run: () => cw.ask_({
@@ -328,6 +369,20 @@ FloatingWindow {
         detail: "It goes to the trash with every event in it — restore it from there if you change your mind.",
         choices: [{ label: "Delete", ink: Zenon.red, run: () => Chronos.deleteCalendar(cal.name, (j) => cw.say(j.error ? j.error : "Moved to the trash", !!j.error)) },
                   { label: "Cancel" }] }) }] : []), cal.name);
+  }
+  // an account's menu, from its line in the sidebar
+  function accountMenu(acct, item, x, y) {
+    const p = item.mapToItem(stage, x, y);
+    menu.open(p.x, p.y, [
+      { text: "Sync now", icon: "\u{F0E8E}", mark: "r", run: () => cw.sync() },
+      { text: "Add an account…", icon: "\u{F0415}", run: () => accSheet.open() },
+      { isSeparator: true },
+      { text: "Remove…", icon: "\u{F09E7}", danger: true, run: () => cw.ask_({
+        question: "Remove “" + acct.name + "”?", glyph: "\u{F09E7}", ink: Zenon.red,
+        detail: "Its calendars stay on the server; the copies here go to the trash and its password leaves the keyring.",
+        choices: [{ label: "Remove", ink: Zenon.red, run: () => Chronos.removeAccount(acct.name, (j) => cw.say(j.error ? j.error : "Removed — its copies are in the trash", !!j.error)) },
+                  { label: "Cancel" }] }) },
+    ], "acct:" + acct.name);
   }
   // a new calendar (cal null) or one renamed
   function calForm(cal) {
@@ -459,70 +514,92 @@ FloatingWindow {
           id: calCol
           x: 12
           width: parent.width - 24
-          // the calendars, under the account each is from: this computer's first
+          // ── THE CALENDARS, BY WHERE THEY LIVE (user, 2026-10-28: "add an
+          // account is oddly placed") ──
+          // Two headings, as Network's sidebar has one: "On this computer",
+          // whose + makes a calendar, and "Online", whose + adds an account —
+          // the button that trailed the list is gone. Under Online each
+          // account is a quiet line of its own (its menu: sync, remove), its
+          // calendars under it; with none yet, a word on what can go there.
+          SideHead {
+            first: true
+            ruled: false
+            width: parent.width
+            visible: Chronos.calReady
+            label: "On this computer"
+            action: true
+            onActed: cw.calForm(null)
+          }
           Repeater {
-            model: {
-              const groups = [""].concat(Chronos.accounts.map((a) => a.name));
-              return groups.map((g) => ({ name: g, cals: Chronos.calendars.filter((c) => Chr.groupOf(c, Chronos.accounts) === g) }))
-                .filter((g) => g.cals.length > 0);
-            }
+            model: Chronos.calendars.filter((c) => cw.isLocal(c))
+            delegate: CalRow { win: cw }
+          }
+          SideHead {
+            ruled: false
+            width: parent.width
+            visible: Chronos.calReady
+            label: "Online"
+            action: true
+            onActed: accSheet.open()
+          }
+          Text {
+            x: 15
+            width: parent.width - 27
+            visible: Chronos.calReady && Chronos.accounts.length === 0
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+            text: "iCloud, Fastmail, Nextcloud or any CalDAV server, kept in step with your other devices."
+            color: Zenon.accentMuted
+            font.family: Zenon.face
+            font.weight: Zenon.weight
+            font.pixelSize: Zenon.px(12)
+            lineHeight: 1.15
+          }
+          Repeater {
+            model: Chronos.accounts
             delegate: Column {
-              id: grp
+              id: acc
               required property var modelData
               required property int index
               width: calCol.width
-              SideHead {
-                first: grp.index === 0
-                ruled: false
+              // the account's name, a line under the heading's and quieter
+              Item {
                 width: parent.width
-                label: grp.modelData.name === "" ? "On this computer" : grp.modelData.name
-                // a calendar of your own, made here
-                action: grp.modelData.name === ""
-                onActed: cw.calForm(null)
+                height: acc.index === 0 ? 24 : 32
+                Text {
+                  x: 15
+                  anchors.bottom: parent.bottom
+                  anchors.bottomMargin: 4
+                  width: parent.width - 27
+                  textFormat: Text.PlainText
+                  elide: Text.ElideRight
+                  text: acc.modelData.name
+                  color: Zenon.accentMuted
+                  font.family: Zenon.face
+                  font.weight: Zenon.weight
+                  font.pixelSize: Zenon.px(12)
+                }
+                HeldRing {
+                  anchors.fill: parent
+                  anchors.leftMargin: -2
+                  anchors.rightMargin: 2
+                  radius: Zenon.radiusControl
+                  on: cw.heldKey === "acct:" + acc.modelData.name
+                }
+                TapHandler {
+                  acceptedButtons: Qt.RightButton
+                  onTapped: (pt) => cw.accountMenu(acc.modelData, parent, pt.position.x, pt.position.y)
+                }
               }
               Repeater {
-                model: grp.modelData.cals
-                delegate: Item {
-                  id: crow
-                  required property var modelData
-                  width: grp.width
-                  height: 28
-                  Ctl.Check {
-                    x: 4
-                    anchors.verticalCenter: parent.verticalCenter
-                    lit: cw.settings.hidden.indexOf(crow.modelData.name) < 0
-                    ink: cw.inkOf(crow.modelData.name)
-                    label: crow.modelData.title
-                    textSize: Zenon.px(14)
-                    onToggled: cw.toggleCal(crow.modelData.name)
-                  }
-                  // ringed while its menu is up (terminus' HeldRing)
-                  HeldRing {
-                    anchors.fill: parent
-                    anchors.leftMargin: -2
-                    anchors.rightMargin: 2
-                    radius: Zenon.radiusControl
-                    on: cw.heldKey === crow.modelData.name
-                  }
-                  // its menu: rename, color, show or hide, delete
-                  TapHandler {
-                    acceptedButtons: Qt.RightButton
-                    onTapped: (pt) => cw.calMenu(crow.modelData, crow, pt.position.x, pt.position.y)
-                  }
-                }
+                model: Chronos.calendars.filter((c) => Chr.groupOf(c, Chronos.accounts) === acc.modelData.name)
+                delegate: CalRow { win: cw }
               }
             }
           }
-          Item { width: 1; height: 10 }
-          DialogButton {
-            x: 4
-            label: Chronos.accounts.length ? "Accounts…" : "Add an account…"
-            implicitHeight: 28
-            ready: Chronos.calReady
-            onClicked: accSheet.open()
-          }
         }
       }
+      Scrollbar { flick: sideList; anchors.right: parent.right; anchors.top: sideList.top; anchors.bottom: sideList.bottom }
       ElasticScroll { anchors.fill: sideList; view: sideList }
 
       // a small month at the sidebar's foot, a day a click
@@ -871,6 +948,7 @@ FloatingWindow {
         }
       }
       ElasticScroll { anchors.fill: yearView; view: yearView; visible: yearView.visible }
+      Scrollbar { flick: yearView; visible: yearView.visible; anchors.right: yearView.right; anchors.top: yearView.top; anchors.bottom: yearView.bottom }
 
       // ── a week, a day: the hours ──
       Item {
@@ -1690,8 +1768,8 @@ FloatingWindow {
             height: 34
             Column {
               anchors.verticalCenter: parent.verticalCenter
-              Text { text: arow.modelData.name; color: Zenon.ink; font.family: Zenon.face; font.weight: Font.Bold; font.pixelSize: Zenon.px(14) }
-              Text { text: arow.modelData.user + " · " + arow.modelData.url; color: Zenon.accentMuted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(12) }
+              Text { textFormat: Text.PlainText; text: arow.modelData.name; color: Zenon.ink; font.family: Zenon.face; font.weight: Font.Bold; font.pixelSize: Zenon.px(14) }
+              Text { textFormat: Text.PlainText; text: arow.modelData.user + " · " + arow.modelData.url; color: Zenon.accentMuted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(12) }
             }
             DialogButton {
               anchors.right: parent.right
@@ -1704,7 +1782,7 @@ FloatingWindow {
               onClicked: {
                 if (accSheet.removing !== arow.modelData.name) { accSheet.removing = arow.modelData.name; return; }
                 accSheet.removing = "";
-                Chronos.removeAccount(arow.modelData.name, () => cw.say("Removed — its copies are in the trash", false));
+                Chronos.removeAccount(arow.modelData.name, (j) => cw.say(j.error ? j.error : "Removed — its copies are in the trash", !!j.error));
               }
             }
           }

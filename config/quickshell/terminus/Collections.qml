@@ -327,6 +327,7 @@ Item {
     const cmd = Coll.command(f, Paths.home());
     if (cmd === "") { term.status = "No rules yet"; return; }
     term.status = "Searching\u2026";
+    collections.killCollGroup();
     collProc.folder = f;
     collProc.running = false;
     collProc.command = ["setsid", "sh", "-c", cmd];
@@ -389,6 +390,7 @@ Item {
                                            term.tagMarks));
       return;
     }
+    collections.killCollGroup();
     collProc.folder = f;
     collProc.running = false;
     collProc.command = ["setsid", "sh", "-c", cmd];
@@ -399,11 +401,17 @@ Item {
   // on costing.
   function cancelCollection() {
     if (!collProc.running) return;
-    const pid = collProc.processId;
-    if (pid > 0)
-      Quickshell.execDetached(["sh", "-c", "kill -TERM -" + pid + " 2>/dev/null"]);
+    collections.killCollGroup();
     collProc.running = false;
     collProc.folder = null;
+  }
+  // the run's whole group (setsid): `running = false` ends only the sh, and
+  // its fd/rg went on holding the pipe — a slow search left behind finished
+  // AFTER the next one and landed as its answer (audit 2026-10-28c)
+  function killCollGroup() {
+    const pid = collProc.running ? collProc.processId : 0;
+    if (pid > 0)
+      Quickshell.execDetached(["sh", "-c", "kill -TERM -" + pid + " 2>/dev/null"]);
   }
   // A fourth searchMode rather than a view of its own, because that is
   // exactly what it is: a set of paths from all over the tree, shown with

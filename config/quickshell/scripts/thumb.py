@@ -34,6 +34,16 @@ def ext(path):
     return os.path.splitext(path)[1].lower().lstrip(".")
 
 
+# AN ARCHIVE MEMBER'S CODER, from its name (audit 2026-10-28b): bytes on
+# stdin were left to magick to recognise, so a comic page or an EPUB cover
+# that was really SVG or MVG reached ImageMagick's vector coders, which
+# read local files and fetch addresses. Pictures only; "" for anything else.
+def coder(name):
+    e = ext(name)
+    return {"jpg": "jpeg", "jpeg": "jpeg", "png": "png", "webp": "webp", "gif": "gif",
+            "bmp": "bmp", "avif": "avif", "jxl": "jxl"}.get(e, "")
+
+
 def natural(name):
     return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", name)]
 
@@ -99,27 +109,28 @@ def layered(src, out, px):
 # page10 does not come before page2.
 def comic(src, out, px):
     e = ext(src)
-    data = b""
+    data, kind = b"", ""
     if e in ("cbz",) and zipfile.is_zipfile(src):
         with zipfile.ZipFile(src) as z:
             pics = sorted((n for n in z.namelist()
                            if n.lower().endswith(PICS) and not n.startswith("__MACOSX")),
                           key=natural)
             if pics:
-                data = z.read(pics[0])
+                data, kind = z.read(pics[0]), coder(pics[0])
     elif e == "cbr":
         names = run(["unrar", "lb", "-inul", src]).decode("utf-8", "replace").splitlines()
         pics = sorted((n for n in names if n.lower().endswith(PICS)), key=natural)
         if pics:
             # -n restricts to the one member; unrar takes the name literally
-            data = run(["unrar", "p", "-inul", "-n" + pics[0], src])
+            data, kind = run(["unrar", "p", "-inul", "-n" + pics[0], src]), coder(pics[0])
     else:  # cb7, cbt — and a .cbz that is secretly a rar
         names = run(["bsdtar", "-tf", src]).decode("utf-8", "replace").splitlines()
         pics = sorted((n for n in names if n.lower().endswith(PICS)), key=natural)
         if pics:
-            data = run(["7z", "e", "-so", "-spd", src, pics[0]])
-    if data:
-        finish("-", out, px, data)
+            # "--": a member's name is the archive's to choose
+            data, kind = run(["7z", "e", "-so", "-spd", "--", src, pics[0]]), coder(pics[0])
+    if data and kind:
+        finish(kind + ":-", out, px, data)
 
 
 # The cover is whatever the package names as one: an EPUB3 item marked
@@ -169,8 +180,8 @@ def epub(src, out, px):
             pics = [n for n in names if n.lower().endswith(PICS)]
             covers = [n for n in pics if "cover" in n.lower()]
             member = (covers or pics or [None])[0]
-        if member:
-            finish("-", out, px, z.read(member))
+        if member and coder(member):
+            finish(coder(member) + ":-", out, px, z.read(member))
 
 
 def main():

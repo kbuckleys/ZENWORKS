@@ -316,8 +316,11 @@ Item {
     t.trailAt = -1;
     t.trailSel = ({});
     t.crumbDeep = "";
-    // nor searched for anything
+    // nor searched for anything — and a results page's rows are not this
+    // directory's: carried over, the byte-identical listing guard kept them
+    // on screen as its contents (audit 2026-10-28d)
     t.search = null;
+    if (term.searchMode !== "" || t.cwd !== term.cwd) { t.rows = []; t.listing = undefined; }
     // ── A NEW TAB DOES NOT INHERIT THE VIEW ──────────────────────────────
     // The state is copied off the tab you are standing in, and the view came
     // with it: opening a tab from a pictures directory in the grid put home in

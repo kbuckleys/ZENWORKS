@@ -67,7 +67,9 @@ Item {
         // knows nothing about.
         const asked = term.gitAsked;
         term.gitAsked = "";
-        if (asked !== term.cwd) return;
+        // and the directory we are in now is asked about in its turn: its
+        // own scan was refused while this one ran (audit 2026-10-28d)
+        if (asked !== term.cwd) { Qt.callLater(term.scanGit); return; }
         const g = Terminus.parseGit(gitOut.text);
         term.gitRoot = g.root;
         term.gitBranch = g.branch;

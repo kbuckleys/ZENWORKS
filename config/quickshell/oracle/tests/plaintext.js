@@ -19,7 +19,7 @@ const fs = require("fs");
 const path = require("path");
 
 const SKIP_DIR = /^(oracle\/tests|oracle\/qmltests|themes|plato\/nvim)(\/|$)/;
-const SRC = /\b(title|summary|body|appName|artist|album|track|location|description|message|subject|label|name|path|text|preview|line|comment|author|desc|words|detail|content|snippet)\b/i;
+const SRC = /\b(title|summary|body|appName|artist|album|track|location|description|message|subject|label|name|path|text|preview|line|comment|author|desc|words|detail|content|snippet|caption|version)\b|modelData\[\d\]/i;
 
 function walk(root, d, out) {
   for (const e of fs.readdirSync(path.join(root, d), { withFileTypes: true })) {
@@ -39,6 +39,14 @@ module.exports = {
     for (const f of walk(root, "", [])) {
       const lines = fs.readFileSync(path.join(root, f), "utf8").split("\n");
       for (let i = 0; i < lines.length; ++i) {
+        // a Text written on one line, `Text { text: …; color: … }`
+        const one = /^\s*(Text|Label)\s*\{(.*)\}\s*$/.exec(lines[i]);
+        if (one) {
+          const tx1 = /(?:^|;)\s*text:\s*([^;]+)/.exec(one[2]);
+          if (tx1 && !/textFormat/.test(one[2]) && !/^\s*"[^"]*"\s*$/.test(tx1[1]) && SRC.test(tx1[1]))
+            bad.push(f + ":" + (i + 1) + "  " + tx1[1].trim().slice(0, 70));
+          continue;
+        }
         const m = /^(\s*)(Text|Label)\s*\{\s*$/.exec(lines[i]);
         if (!m) continue;
         const close = new RegExp("^\\s{" + m[1].length + "}\\}");

@@ -177,7 +177,9 @@ LayerPopup {
   function activateRowNow(r) {
     if (popup.mode === "wifi") {
       const how = Hermes.join(r, "");
-      if (how === "ask") { popup.pskNet = r; popup.mode = "psk"; popup.syncFocus(); }
+      // a fresh ask is not a wrong one: the last network's "Wrong password"
+      // stayed up for the next (audit 2026-10-28d)
+      if (how === "ask") { popup.pskNet = r; pskField.failed = false; popup.mode = "psk"; popup.syncFocus(); }
     } else if (popup.mode === "bt") Hermes.toggleDevice(r);
     else if (popup.mode === "vpn") Hermes.toggleVpn(r);
   }

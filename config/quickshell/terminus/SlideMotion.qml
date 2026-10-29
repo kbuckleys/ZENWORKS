@@ -475,8 +475,12 @@ Item {
     interval: 2000
     onTriggered: {
       const here = [term.cwd, term.otherCwd];
-      for (const t of term.tabs) if (t && t.cwd) here.push(t.cwd);
-      if (term.tabs[term.tab] && term.tabs[term.tab].otherCwd) here.push(term.tabs[term.tab].otherCwd);
+      // every tab's second pane too, not only this one's: another tab's
+      // pane inside an archive was unmounted under it (audit 2026-10-28d)
+      for (const t of term.tabs) {
+        if (t && t.cwd) here.push(t.cwd);
+        if (t && t.otherCwd) here.push(t.otherCwd);
+      }
       const next = Object.assign({}, term.archMounts);
       let gone = 0;
       for (const m in term.archMounts) {

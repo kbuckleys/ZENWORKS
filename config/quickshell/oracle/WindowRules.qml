@@ -415,6 +415,15 @@ Item {
                   }
                 }
                 Line {
+                  label: "Border"
+                  T.Segments {
+                    options: [["", "Usual"], ["accent", "Accent"], ["blue", "Blue"], ["green", "Green"],
+                              ["yellow", "Yellow"], ["magenta", "Magenta"]]
+                    current: ed.r.border
+                    onChose: (v) => ed.set({ border: v })
+                  }
+                }
+                Line {
                   label: "Keep awake"
                   T.Segments {
                     options: [["", "No"], ["focus", "While focused"], ["fullscreen", "In full screen"], ["always", "Always"]]

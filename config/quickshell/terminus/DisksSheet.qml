@@ -66,9 +66,22 @@ Rectangle {
   }
 
   readonly property var cur: disks.rows[disks.sel] || null
+  // the cursor stays on its DISK, not its index: a mount moves that disk
+  // into the mounted half, and Return then went to another one (audit
+  // 2026-10-28d)
+  property string selPath: ""
+  function pick(i) {
+    disks.sel = i;
+    disks.selPath = disks.rows[i] ? disks.rows[i].path : "";
+  }
+  onRowsChanged: {
+    const i = disks.rows.findIndex((d) => d.path === disks.selPath);
+    if (i >= 0 && i !== disks.sel) disks.sel = i;
+    else if (disks.sel >= disks.rows.length) disks.sel = Math.max(0, disks.rows.length - 1);
+  }
 
   function ask() {
-    disks.sel = 0;
+    disks.pick(0);
     disks.open = true;
   }
 
@@ -80,7 +93,7 @@ Rectangle {
   function step(d) {
     const n = disks.rows.length;
     if (n === 0) return;
-    disks.sel = (disks.sel + d + n) % n;
+    disks.pick((disks.sel + d + n) % n);
     disksList.positionViewAtIndex(disks.sel, ListView.Contain);
   }
 
@@ -285,7 +298,7 @@ Rectangle {
 
         MouseArea {
           anchors.fill: parent
-          onClicked: { disks.sel = diskRow.index; disks.enter(); }
+          onClicked: { disks.pick(diskRow.index); disks.enter(); }
         }
       }
     }

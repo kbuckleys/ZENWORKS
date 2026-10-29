@@ -1895,11 +1895,22 @@ LayerPopup {
       // A Row would have had to be told the field's width as a number; anchored
       // between its two neighbors instead, the field gives back exactly the room
       // the status line needs however long it gets.
+      // a click on the × empties the filter, as esc does (Picasso's)
+      ClearChip {
+        id: queryClear
+        anchors.right: barStatus.left
+        anchors.rightMargin: 16
+        anchors.verticalCenter: parent.verticalCenter
+        size: Zenon.px(15)
+        shown: filterField.text !== "" && bar.height > 2
+        onClicked: bar.clear()
+      }
+
       Item {
         anchors.left: filterGlyph.right
         anchors.leftMargin: 10
-        anchors.right: barStatus.left
-        anchors.rightMargin: 16
+        anchors.right: queryClear.visible ? queryClear.left : barStatus.left
+        anchors.rightMargin: queryClear.visible ? 8 : 16
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         visible: bar.height > 2

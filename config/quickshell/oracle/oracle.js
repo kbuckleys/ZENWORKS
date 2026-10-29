@@ -492,7 +492,7 @@ const PAGES = {
     ["Calendar", ["calRemindLead", "calSyncMins"]]
   ],
   motion: [
-    ["Animations", ["motionScale", "hyprAnimations", "cursorSlide"]],
+    ["Animations", ["motionScale", "hyprAnimations", "hyprWobble", "cursorSlide"]],
     ["Scrolling", ["elasticScroll", "scrollbarAutohide"]],
     ["Arrival", ["arrivalEnabled", "arrivalDuration", "arrivalDeadline"]]
   ],
@@ -500,7 +500,7 @@ const PAGES = {
     // the sample of them all first, under no heading (OracleWindow's SurfaceSample)
     ["", ["surfacesSample"]],
     ["Shape", ["cornerRadius", "barMaxWidth", "barScreenPad"]],
-    ["Opacity", ["panelOpacity", "menuOpacity", "scrollFrost"]],
+    ["Opacity", ["panelOpacity", "menuOpacity", "scrollFrost", "frostStyle"]],
     ["Shadows", ["shadowStrength", "menuShadows", "hyprShadows"]]
   ]
 };
@@ -817,6 +817,20 @@ function readCheckup(text, baselineKb) {
           fix: { label: "Run preflight", act: "preflight" } }
       : { text: now.filter((p) => /^(quickshell|qt6-base|hyprland) /.test(p)).map(short).join(" \u00b7 ") + " \u00b7 preflight passed on these", level: "ok" };
   }
+
+  // Hyprland's config errors and deprecations (doctor.sh hyprerr/hyprdep,
+  // JSON arrays of strings). An empty configerrors still answers [""].
+  const strings = (k) => {
+    try { const a = JSON.parse(f[k] || "[]"); return Array.isArray(a) ? a.map(String).filter((x) => x.trim() !== "") : []; }
+    catch (e) { return null; }
+  };
+  const hErr = strings("hyprerr"), hDep = strings("hyprdep");
+  if (hErr === null || hDep === null) rows.hypr = { text: "unreadable", level: "warn" };
+  else if (hErr.length) rows.hypr = { text: hErr.length + (hErr.length === 1 ? " config error" : " config errors"), level: "bad",
+                                      detail: hErr.concat(hDep).join("\n") };
+  else if (hDep.length) rows.hypr = { text: hDep.length + " deprecated \u2014 works now, gone in a later Hyprland", level: "warn",
+                                      detail: hDep.join("\n") };
+  else rows.hypr = { text: "no config errors \u00b7 nothing deprecated", level: "ok" };
 
   // name:1/0 per tool, in TOOLS' order; the row carries the whole list for
   // its fold-out (ToolsPanel), missing ones first
@@ -1727,7 +1741,7 @@ const INPUT_FIELDS = [
   { key: "natural_scroll", group: "scroll", def: false, type: "bool",
     label: "Natural scrolling", alias: "mouse wheel scroll natural reverse direction",
     help: "The wheel moves the page rather than the view: down brings the page up." },
-  { key: "scroll_factor", group: "scroll", def: 1, type: "real", min: 0, max: 2, step: 0.05, unit: "x",
+  { key: "scroll_factor", group: "scroll", def: 1, type: "real", min: 0, max: 5, step: 0.05, unit: "x",
     label: "Scroll speed", alias: "mouse wheel scroll speed factor",
     help: "How far a turn of the wheel scrolls, against the mouse's own." },
   { key: "scroll_method", group: "scroll", def: "", type: "enum",
@@ -1810,7 +1824,7 @@ const INPUT_FIELDS = [
   { key: "touchpad_natural_scroll", group: "touchpad", def: false, type: "bool",
     label: "Natural scrolling", alias: "touchpad trackpad scroll natural reverse direction laptop",
     help: "Two fingers move the page the way they move, as on a phone." },
-  { key: "touchpad_scroll_factor", group: "touchpad", def: 1, type: "real", min: 0, max: 2, step: 0.05, unit: "x",
+  { key: "touchpad_scroll_factor", group: "touchpad", def: 1, type: "real", min: 0, max: 5, step: 0.05, unit: "x",
     label: "Scroll speed", alias: "touchpad trackpad scroll speed factor laptop",
     help: "How far two fingers scroll, against the touchpad's own." },
   { key: "touchpad_disable_while_typing", group: "touchpad", def: true, type: "bool",
@@ -2429,6 +2443,7 @@ function imClassicUi(text) {
 var EFFECTS = [
   { fx: "shadows",          def: true },
   { fx: "animations",       def: true },
+  { fx: "wobble",           def: false },
   { fx: "gaps_out",         def: 8, min: 0, max: 40 },
   { fx: "gaps_in",          def: 2, min: 0, max: 20 },
   { fx: "special_gaps",     def: 30, min: 0, max: 120 },
@@ -2555,7 +2570,7 @@ const ZEN_HEAD = [
 // of the title, or "" for every window of the app.
 const RULE_ORDER = ["name", "class", "title", "on", "float", "size", "center", "workspace", "silent",
                     "opacity", "pin", "no_blur", "idle_inhibit", "open", "no_initial_focus",
-                    "persistent_size", "shipped"];
+                    "persistent_size", "border", "shipped"];
 // A class some apps make new at every launch — transmission-gtk's is
 // "com.transmissionbt.transmission_<pid>_<random>" — kept without that
 // tail, or the rule would only ever match the one window it was picked
@@ -2565,7 +2580,7 @@ function blankWindowRule(cls, name, title) {
   return { name: String(name || cls || ""), class: stableClass(cls), title: String(title || ""), on: true,
            float: false, size: "", center: false, workspace: "", silent: false, opacity: 100,
            pin: false, no_blur: false, idle_inhibit: "", open: "", no_initial_focus: false,
-           persistent_size: false, shipped: "" };
+           persistent_size: false, border: "", shipped: "" };
 }
 // The suite's own windows all share quickshell's class and differ only by
 // title ("terminus", "plato", "picasso-view" — each Window's title:), so the
@@ -2595,6 +2610,9 @@ function windowPickRows(clients, shipped, nameOf) {
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
+// a rule's Border: one of the theme's hues (theme.lua's rule_<hue>), or ""
+// for the usual one. Never red: red is the urgent flash.
+var RULE_BORDERS = ["", "accent", "blue", "green", "yellow", "magenta"];
 // a rule as read, with every field there and in range
 function normWindowRule(r) {
   const b = blankWindowRule();
@@ -2607,6 +2625,7 @@ function normWindowRule(r) {
   if (!/^\d+ \d+$/.test(o.size)) o.size = "";
   if (["", "focus", "fullscreen", "always"].indexOf(o.idle_inhibit) < 0) o.idle_inhibit = "";
   if (["", "maximize", "fullscreen"].indexOf(o.open) < 0) o.open = "";
+  if (RULE_BORDERS.indexOf(o.border) < 0) o.border = "";
   if (!/^(\d+|special(:\w+)?|name:\S+)?$/.test(o.workspace)) o.workspace = "";
   return o;
 }
@@ -2625,6 +2644,7 @@ function renderWindowsLua(rules) {
     "-- workspace  \"3\", \"special\" or \"\"; silent keeps you where you are",
     "-- idle_inhibit  \"focus\", \"fullscreen\", \"always\" or \"\"",
     "-- open     \"maximize\", \"fullscreen\" or \"\"",
+    "-- border   \"accent\", \"blue\", \"green\", \"yellow\", \"magenta\" or \"\" (the theme's)",
   ]), (rules || []).map(normWindowRule).map((r) => {
     // only a stand-in for a shipped rule says which one
     if (r.shipped === "") delete r.shipped;
@@ -2694,6 +2714,7 @@ function windowRuleWords(r) {
   if (r.no_blur) w.push("no blur");
   if (r.idle_inhibit) w.push("keeps awake" + (r.idle_inhibit === "always" ? "" : r.idle_inhibit === "focus" ? " while focused" : " in full screen"));
   if (r.no_initial_focus) w.push("opens unfocused");
+  if (r.border) w.push(r.border + " border");
   if (!w.length) return "does nothing yet";
   const s = w.join(" · ");
   return s[0].toUpperCase() + s.slice(1);

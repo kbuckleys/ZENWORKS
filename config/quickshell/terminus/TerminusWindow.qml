@@ -2291,6 +2291,19 @@ FloatingWindow {
     root.applyDepth--;
   }
   onShowHiddenChanged: opening.viewSave.restart()
+  // the Preferences sheet's switches (and Disk usage, Git status) set these
+  // alone; nothing wrote them down until some other change saved the view,
+  // so a switch flipped just before a restart came back (audit 2026-10-28d)
+  onThumbsOnChanged: opening.viewSave.restart()
+  onPreviewOnChanged: opening.viewSave.restart()
+  onConfirmTrashChanged: opening.viewSave.restart()
+  onNaturalSortChanged: opening.viewSave.restart()
+  onGroupedChanged: opening.viewSave.restart()
+  onDirsFirstChanged: opening.viewSave.restart()
+  onAlwaysTabsChanged: opening.viewSave.restart()
+  onColHeadsOnChanged: opening.viewSave.restart()
+  onUsageChanged: opening.viewSave.restart()
+  onGitChanged: opening.viewSave.restart()
 
   // Every view scrolls its own way, and only one of them is on screen — but
   // telling all three is cheaper than asking which, and means switching view

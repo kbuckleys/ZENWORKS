@@ -121,13 +121,14 @@ function windowAt(wins, x, y) {
 }
 
 // `hyprctl clients -j`, reduced to the windows visible on one monitor, in
-// that monitor's coordinates. `ws` is the ids of the workspaces shown on
-// it (the active one, and a special one if open).
+// that monitor's coordinates. `ws` is the addresses of the workspaces shown
+// on it (the active one, and a special one if open). By address, not id:
+// since Hyprland 0.57 a special or named workspace has no id at all.
 function windowsOn(clients, monitor, ws) {
   const out = [];
   for (const c of clients || []) {
     if (!c || !c.mapped || c.hidden) continue;
-    if (!c.workspace || ws.indexOf(c.workspace.id) < 0) continue;
+    if (!c.workspace || !c.workspace.address || ws.indexOf(String(c.workspace.address)) < 0) continue;
     out.push({ x: c.at[0] - monitor.x, y: c.at[1] - monitor.y,
                w: c.size[0], h: c.size[1], title: String(c.title || ""),
                address: String(c.address || "") });

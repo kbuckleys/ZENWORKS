@@ -790,14 +790,16 @@ property var statusbar: null
           // and the row strip can no longer show you what you are typing.
           property bool showInput: input.text.length > 0 && popup.filtered.length === 0
           width: showInput
-            ? Math.min(10 + promptText.width + input.contentWidth + 12, 700)
+            ? Math.min(10 + promptText.width + input.contentWidth + 12 + queryClear.width + 14, 700)
             : 0
           height: parent.height
           color: "transparent"
           Behavior on width { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
 
           Row {
-            anchors.fill: parent
+            anchors.left: parent.left
+            anchors.right: queryClear.left
+            height: parent.height
             leftPadding: 10
             spacing: 0
 
@@ -842,6 +844,17 @@ property var statusbar: null
                 popup.applyFilter();
               }
             }
+          }
+
+          // a click on the × empties the line, as esc does (Picasso's)
+          ClearChip {
+            id: queryClear
+            anchors.right: parent.right
+            anchors.rightMargin: 14
+            anchors.verticalCenter: parent.verticalCenter
+            size: Zenon.px(15)
+            shown: inputBar.showInput
+            onClicked: input.text = ""
           }
         }
 
@@ -1094,7 +1107,11 @@ property var statusbar: null
       }
       Keys.onReturnPressed: (event) => {
         event.accepted = true;
-        popup.confirm();
+        // alt+return here, not in onPressed: Keys calls the named handler
+        // first, and its accepting kept onPressed from ever seeing it
+        // (audit 2026-10-28d)
+        if (event.modifiers & Qt.AltModifier) popup.showPicker();
+        else popup.confirm();
       }
       Keys.onTabPressed: (event) => {
         event.accepted = true;
@@ -1112,9 +1129,6 @@ property var statusbar: null
         if (event.key === Qt.Key_Delete) {
           event.accepted = true;
           popup.deleteSelected();
-        } else if (event.key === Qt.Key_Return && (event.modifiers & Qt.AltModifier)) {
-          event.accepted = true;
-          popup.showPicker();
         }
       }
     }

@@ -77,7 +77,13 @@ local function apply(r)
 	if r.open == "fullscreen" then spec.fullscreen = true end
 	if r.no_initial_focus then spec.no_initial_focus = true end
 	hl.window_rule(spec)
+	-- Border: one of the theme's hues. Applied by base.lua after its own
+	-- state borders (floating, zoomed, pinned), so the one you chose wins.
+	if type(r.border) == "string" and r.border:match("^%a+$") then
+		table.insert(ZENWORKS.ruleBorders, { match = spec.match, hue = r.border })
+	end
 end
+ZENWORKS.ruleBorders = {}
 local okDef, shipped = pcall(require, "lua.windowdefaults")
 if not okDef or type(shipped) ~= "table" then shipped = {} end
 local okWin, yours = pcall(require, "lua.windows")

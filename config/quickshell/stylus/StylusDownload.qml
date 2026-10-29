@@ -103,6 +103,7 @@ FocusScope {
               font.pixelSize: Zenon.px(14)
             }
             Text {
+              textFormat: Text.PlainText
               anchors.right: parent.right
               anchors.rightMargin: 10
               anchors.verticalCenter: parent.verticalCenter

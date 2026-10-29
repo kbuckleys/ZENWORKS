@@ -19,7 +19,6 @@
 //   ↑↓ releases · n new · w on the web · r refresh
 
 import QtQuick
-import Quickshell
 import "../morpheus"
 import "../morpheus/controls" as Controls
 import "../terminus"
@@ -122,7 +121,7 @@ Item {
   }
   Component.onCompleted: Qt.callLater(pg.reload)
   onHubKeyChanged: { pg.rels = []; pg.edit = null; pg.reload(); }
-  function web() { if (pg.rel && pg.rel.url) Quickshell.execDetached(["xdg-open", pg.rel.url]); }
+  function web() { if (pg.rel && pg.rel.url) Strings.openLink(pg.rel.url); }
   function moveTo(i) {
     if (pg.rels.length === 0) return;
     pg.sel = Math.max(0, Math.min(pg.rels.length - 1, i));
@@ -447,6 +446,7 @@ Item {
         font.pixelSize: Zenon.px(20)
       }
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         elide: Text.ElideRight
         text: !pg.rel ? "" : [pg.rel.tag, pg.rel.draft ? "a draft" : pg.rel.prerelease ? "a pre-release" : "",
@@ -510,6 +510,7 @@ Item {
                 MouseArea { anchors.fill: parent; onClicked: Strings.openLink(arow.modelData.url) }
               }
               Text {
+                textFormat: Text.PlainText
                 id: asz
                 anchors.right: parent.right
                 anchors.rightMargin: 10

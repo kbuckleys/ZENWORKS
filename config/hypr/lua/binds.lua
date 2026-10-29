@@ -285,7 +285,7 @@ bind("toMonPrev",  "",                         "Move the window to the previous 
 
 -- GROUPS
 bind("group",      "SUPER + SHIFT + G",              "Group or ungroup",               hl.dsp.group.toggle())
-bind("groupLock",  "SUPER + G",                      "Lock the group",                 hl.dsp.group.lock_active({ action = "toggle" }))
+bind("groupLock",  "SUPER + G",                      "Lock the group",                 hl.dsp.group.lock({ action = "toggle" }))
 bind("groupPrev",  "ALT + SHIFT + TAB",              "Previous in the group",          hl.dsp.group.prev(), { repeating = true })
 bind("groupNext",  "ALT + TAB",                      "Next in the group",              hl.dsp.group.next(), { repeating = true })
 

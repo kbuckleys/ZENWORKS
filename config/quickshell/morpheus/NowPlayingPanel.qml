@@ -154,7 +154,7 @@ CursorAnchor {
             width: Math.min(implicitWidth, 380)
             text: NowPlaying.title
             visible: text !== ""
-            color: Zenon.green
+            color: Zenon.cyan
             font.family: Zenon.face
             font.weight: Font.Bold
             font.pixelSize: Zenon.px(16)
@@ -210,7 +210,7 @@ CursorAnchor {
         }
         TransportKey {
           glyph: NowPlaying.playing ? "" : ""
-          ink: Zenon.green
+          ink: Zenon.cyan
           onActivated: NowPlaying.toggle()
         }
         TransportKey {
@@ -264,7 +264,7 @@ CursorAnchor {
             width: parent.width * seekBar.frac
             height: 4
             radius: height / 2
-            color: Zenon.green
+            color: Zenon.cyan
           }
 
           Rectangle {
@@ -274,7 +274,7 @@ CursorAnchor {
             width: 10
             height: 10
             radius: height / 2
-            color: Zenon.green
+            color: Zenon.cyan
             border.color: Zenon.border
             border.width: 1
             visible: seekBar.frac >= 0

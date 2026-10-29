@@ -1008,7 +1008,7 @@ ShellRoot {
       // Starts just past the divider's rule, not at the module's own left
       // edge. A Divider carries a gap on EACH side, so the module begins a
       // full Zenon.gap right of the 1px line — measuring from there left a
-      // strip of bare pill between the divider and the green.
+      // strip of bare pill between the divider and the wash.
       readonly property real takeoverX:
         Zenon.padBar + audioGroup.x + nowMod.x - Zenon.gap
       // It runs to the pill's edge only when nothing follows it. With the
@@ -1020,18 +1020,18 @@ ShellRoot {
         ? Math.max(0, bg.width - bg.takeoverX - bg.border.width)
         // gap on both sides of now playing, plus 1px to sit 0.5px beyond
         // the divider line on the right — otherwise a blank strip shows
-        // between the green wash and the status divider when status is up
+        // between the accent wash and the status divider when status is up
         : Math.max(0, nowMod.width + Zenon.gap * 2 + 1)
       Rectangle {
         id: takeover
         // Faded rather than switched. BarText already eases its color, so
-        // without this the green vanished in one frame while the text was
+        // without this the wash vanished in one frame while the text was
         // still crossfading from black — half a beat of black on black.
         visible: nowMod.active && rise > 0.01
         opacity: root.pillRowFade
         // Play is a sunrise and pause a sunset: rather than the whole wash
         // fading in place, its clear edge climbs up out of the pill's bottom
-        // stroke while the green deepens, and sinks back into it on pause.
+        // stroke while the accent deepens, and sinks back into it on pause.
         // Rising decelerates into place; setting accelerates away, so it
         // reads as going down rather than as the rise played backwards.
         property real rise: NowPlaying.playing ? 1 : 0
@@ -1042,8 +1042,9 @@ ShellRoot {
           }
         }
         // A wash the pill takes on, not a block sitting on it — the same
-        // sunrise the tray wears, in green: clear down to the middle, then
-        // rising into the bottom edge, so the green text keeps its own
+        // sunrise the tray wears, in the accent (Zenon.cyan, so it follows
+        // the theme, Accent color and Follow Background live): clear down to
+        // the middle, then rising into the bottom edge, so the text keeps its own
         // weight against it. The alpha lives in the stops, not in `opacity`,
         // which is already carrying the pill row's fade.
         gradient: Gradient {
@@ -1052,12 +1053,11 @@ ShellRoot {
           GradientStop { position: 1.0 - 0.85 * takeover.rise; color: "transparent" }
           GradientStop {
             position: 1.0
-            color: Qt.rgba(Zenon.green.r, Zenon.green.g, Zenon.green.b,
-                           0.28 * Math.min(1, takeover.rise * 1.6))
+            color: Zenon.alpha(Zenon.cyan, 0.28 * Math.min(1, takeover.rise * 1.6))
           }
         }
         // Inset by the pill's own stroke, and rounded to the INNER curve.
-        // Sitting flush to bg's bounds put the green on top of the 1px border
+        // Sitting flush to bg's bounds put the wash on top of the 1px border
         // with a corner struck at the outer radius, so the two arcs did not
         // nest and the join showed as a sliver.
         anchors.top: parent.top

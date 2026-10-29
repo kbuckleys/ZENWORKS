@@ -511,8 +511,10 @@ LayerPopup {
               source: {
                 const r = row.modelData;
                 if (shotImg.tried < shotImg.pictures.length) return shotImg.pictures[shotImg.tried];
-                // (rows kept from before carry image://icon/ addresses)
-                const im = Howler.imageSource(r.image);
+                // (rows kept from before carry image://icon/ addresses; an
+                // http cover goes through NowPlaying's curl cache, as the
+                // toast's does — never Qt's HTTP/2, audit 2026-10-28b)
+                const im = NowPlaying.art(Howler.imageSource(r.image));
                 if (im !== "") return im;
                 // a file, a file:// address, or a themed name the theme has
                 const ic = Howler.iconSource(r.appIcon);

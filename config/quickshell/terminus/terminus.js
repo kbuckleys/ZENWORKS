@@ -480,12 +480,15 @@ function tagFirst_(tags, path) {
 //
 // Returns "" when the current sort has no useful bands — which is every
 // sort over a listing of one thing.
-function groupLabel(row, key, tags, now) {
+function groupLabel(row, key, tags, now, dirsFirst) {
   if (!row) return "";
   // A directory is its own band under every sort, because dirsFirst has
   // already put them all at the top and they would otherwise be filed
-  // under whatever their name or date happens to say.
-  if (row.isDir && key !== "tag") return "Directories";
+  // under whatever their name or date happens to say. Only while the sort
+  // really keeps them together (sortEntries' own rule): with Directories
+  // first off, or in the usage view, they are among the files, and the
+  // heading came back between them (audit 2026-10-28d).
+  if (row.isDir && key !== "tag" && key !== "usage" && dirsFirst !== false) return "Directories";
 
   if (key === "kind") return KIND_LABEL[kindOf(row.name)] || "Other";
 

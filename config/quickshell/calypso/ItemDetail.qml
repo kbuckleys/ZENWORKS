@@ -132,6 +132,7 @@ Item {
               font.pixelSize: Zenon.px(13)
             }
             Text {
+              textFormat: Text.PlainText
               anchors.verticalCenter: parent.verticalCenter
               width: Math.min(implicitWidth, parent.width - 30)
               elide: Text.ElideMiddle
@@ -444,6 +445,7 @@ Item {
             border.width: 1
             border.color: Zenon.alpha(Zenon.magenta, 0.35)
             Text {
+              textFormat: Text.PlainText
               id: tagText
               anchors.centerIn: parent
               text: "  " + modelData

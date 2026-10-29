@@ -246,7 +246,9 @@ Item {
     if (pg.markedCount > 0) {
       const rs = pg.markedRows, staged = rs[0].area === "staged";
       if (rs[0].area === "conflict") return;
-      const paths = [].concat.apply([], rs.map((r) => r.isDir ? r.paths : [r.path]));
+      // a staged rename is its two paths: unstaging the new one alone left
+      // the old one's deletion staged (audit 2026-10-28d)
+      const paths = [].concat.apply([], rs.map((r) => r.isDir ? r.paths : (staged && r.from ? [r.path, r.from] : [r.path])));
       const n = new Set(paths).size;
       pg.win.act(staged ? "unstage" : "stage", { paths: Array.from(new Set(paths)) },
                  { said: (staged ? "Unstaged " : "Staged ") + n + (n === 1 ? " file" : " files"), then: () => pg.clearMarks() });
@@ -259,7 +261,7 @@ Item {
       else if (f.area !== "conflict") pg.win.act("stage", { paths: f.paths }, { said: "Staged " + f.count + " in " + f.name });
       return;
     }
-    if (f.area === "staged") pg.win.act("unstage", { paths: [f.path] }, {});
+    if (f.area === "staged") pg.win.act("unstage", { paths: f.from ? [f.path, f.from] : [f.path] }, {});
     else if (f.area !== "conflict") pg.win.act("stage", { paths: [f.path] }, {});
   }
   function stageAll() { pg.win.act("stageAll", {}, { said: "Staged everything" }); }

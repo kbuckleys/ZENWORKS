@@ -164,6 +164,7 @@ Item {
           font.pixelSize: Zenon.px(14)
         }
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           elide: Text.ElideRight
           text: irow.modelData.forgeName + "  ·  " + irow.modelData.repo + (irow.modelData.number ? " #" + irow.modelData.number : "")

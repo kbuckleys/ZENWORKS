@@ -376,7 +376,9 @@ FloatingWindow {
     Qt.callLater(win.refocus);
   }
   function usePick() {
-    if (!win.picking || !win.fam || !win.style) return;
+    // an opened font is not installed: Use refuses it, and so do Return and
+    // a double click (audit 2026-10-28d)
+    if (!win.picking || !win.fam || !win.style || win.fam.loose) return;
     const fn = win.pickFn, f = win.fam.name, w = win.style.fcWeight;
     const close = win.pickFresh;
     win.picking = null;
@@ -1215,6 +1217,7 @@ FloatingWindow {
                   border.width: 1
                   border.color: Zenon.border
                   Text {
+                    textFormat: Text.PlainText
                     anchors.centerIn: parent
                     text: tool.modelData[0]
                     color: toolMa.pressed ? Zenon.cyan : Zenon.accentMuted
@@ -1826,6 +1829,7 @@ FloatingWindow {
                 required property var modelData
                 spacing: 18
                 Text {
+                  textFormat: Text.PlainText
                   width: 120
                   text: factRow.modelData[0]
                   color: Zenon.accentMuted
@@ -1834,6 +1838,7 @@ FloatingWindow {
                   font.pixelSize: Zenon.px(13)
                 }
                 Text {
+                  textFormat: Text.PlainText
                   width: infoCol.width - 138
                   wrapMode: Text.Wrap
                   text: factRow.modelData[1]
@@ -1865,6 +1870,7 @@ FloatingWindow {
                 radius: Zenon.windowRadius
                 color: fileMa.pressed ? Zenon.wash(0.06) : Zenon.alpha(Zenon.cyan, 0)
                 Text {
+                  textFormat: Text.PlainText
                   anchors.left: parent.left
                   anchors.leftMargin: 10
                   anchors.right: parent.right

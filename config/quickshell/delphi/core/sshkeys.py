@@ -465,6 +465,10 @@ def read_test(code, text):
     """What `ssh -T` said: {ok, why, login, line}."""
     lines = [l.strip() for l in (text or "").splitlines() if l.strip() and not l.startswith("Warning: Permanently")]
     last = lines[-1] if lines else ""
+    # killed (Esc, the 120 s timeout): it never got in — read as "got in",
+    # the remote was switched to ssh on it (audit 2026-10-28d)
+    if code is None or code < 0:
+        return {"ok": False, "why": "network", "login": "", "line": last}
     if code == 255:
         low = (text or "").lower()
         why = next((w for k, w in WHY if k in low), "error")
@@ -500,6 +504,8 @@ def test(host, user=None, sock=None, cancel=None):
     finally:
         if cancel:
             cancel.detach(p)
+    if cancel:
+        cancel.check()   # stopped: the request ends as cancelled, not as an answer
     return dict(read_test(p.returncode, out), host=host, user=user)
 
 

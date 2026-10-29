@@ -320,12 +320,12 @@ Item {
         // gh hands a one-time code to type; glab only a page to open
         codeCard = pg.win.card_(d.code ? { question: "Your code:  " + d.code, glyph: s.glyph, ink: Zenon.cyan,
             detail: "Enter it at " + d.url.replace(/^https:\/\//, "") + " — this card goes by itself once " + s.name + " says yes.",
-            choices: [{ label: "Open " + s.name, ink: Zenon.cyan, keep: true, run: () => Quickshell.execDetached(["xdg-open", d.url]) },
+            choices: [{ label: "Open " + s.name, ink: Zenon.cyan, keep: true, run: () => Strings.openLink(d.url) },
                       { label: "Copy the code", keep: true, run: () => pg.win.copy(d.code, "the code") },
                       { label: "Cancel", ink: Zenon.accentMuted, run: () => pg.win.stop(job) }] }
           : { question: "Finish in your browser", glyph: s.glyph, ink: Zenon.cyan,
             detail: s.name + " asks there whether " + s.cli + " may act for you. This card goes by itself once it says yes.",
-            choices: [{ label: "Open the page again", ink: Zenon.cyan, keep: true, run: () => Quickshell.execDetached(["xdg-open", d.url]) },
+            choices: [{ label: "Open the page again", ink: Zenon.cyan, keep: true, run: () => Strings.openLink(d.url) },
                       { label: "Cancel", ink: Zenon.accentMuted, run: () => pg.win.stop(job) }] });
       },
       done: () => { if (codeCard >= 0) pg.win.dropCard(codeCard); },

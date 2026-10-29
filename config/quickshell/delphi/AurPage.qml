@@ -412,8 +412,8 @@ Item {
         delegate: Row {
           required property var modelData
           spacing: 16
-          Text { width: Zenon.px(15) * 8; text: modelData[0]; color: Zenon.accentMuted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(14) }
-          Text { text: modelData[1]; color: modelData[2]; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(15) }
+          Text { textFormat: Text.PlainText; width: Zenon.px(15) * 8; text: modelData[0]; color: Zenon.accentMuted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(14) }
+          Text { textFormat: Text.PlainText; text: modelData[1]; color: modelData[2]; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(15) }
         }
       }
       Text {
@@ -441,8 +441,8 @@ Item {
         delegate: Row {
           required property var modelData
           spacing: 16
-          Text { width: Zenon.px(15) * 8; text: modelData[0]; color: Zenon.accentMuted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(14) }
-          Text { text: modelData[1]; color: modelData[2]; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(15) }
+          Text { textFormat: Text.PlainText; width: Zenon.px(15) * 8; text: modelData[0]; color: Zenon.accentMuted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(14) }
+          Text { textFormat: Text.PlainText; text: modelData[1]; color: modelData[2]; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(15) }
         }
       }
 
@@ -456,7 +456,7 @@ Item {
           spacing: 16
           readonly property color mark: modelData.state === "ok" ? Zenon.green : modelData.state === "bad" ? Zenon.red
             : modelData.state === "run" ? Zenon.cyan : Zenon.accentMuted
-          Text { width: Zenon.px(15) * 8; text: srow.modelData.label; color: Zenon.accentMuted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(14) }
+          Text { textFormat: Text.PlainText; width: Zenon.px(15) * 8; text: srow.modelData.label; color: Zenon.accentMuted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(14) }
           Text {
             width: Zenon.px(15) * 1.4
             text: srow.modelData.state === "ok" ? "\uF00C" : srow.modelData.state === "bad" ? "\uF00D"

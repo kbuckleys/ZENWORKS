@@ -90,6 +90,7 @@ Column {
         required property var modelData
         spacing: 2
         Text {
+          textFormat: Text.PlainText
           text: modelData[1]
           color: Zenon.ink
           font.family: Zenon.face
@@ -97,6 +98,7 @@ Column {
           font.pixelSize: Zenon.px(20)
         }
         Text {
+          textFormat: Text.PlainText
           text: modelData[0]
           color: Zenon.accentMuted
           font.family: Zenon.face

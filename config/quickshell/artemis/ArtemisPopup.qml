@@ -372,6 +372,10 @@ LayerPopup {
     const q = popup.query.trim()
     if (q === "") {
       popup.searching = false
+      // what was out or queued is for the words just cleared: its answer,
+      // still delivered, replaced the list below (audit 2026-10-28d)
+      popup.searchGen++
+      searchProc.nextCmd = ""
       searchProc.running = false
       // What you actually open, most-used first. The old opening view was
       // `fd --max-results 200 | sort`, which bails after the first 200 hits
@@ -675,8 +679,10 @@ LayerPopup {
           Behavior on height { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
 
           Row {
-            anchors.fill: parent
+            anchors.left: parent.left
             anchors.leftMargin: 10
+            anchors.right: busyDots.left
+            height: parent.height
             spacing: 0
             // fades in as it unfolds, rather than being uncovered by the clip
             opacity: inputBar.height / 36
@@ -701,7 +707,7 @@ LayerPopup {
 
             TextInput {
               id: searchInput
-              width: parent.width - promptText.width - busyDots.width - 16
+              width: parent.width - promptText.width
               height: parent.height
               // the words in the ink; the lens beside them keeps the magenta
               // (the user's call, 2026-10-08)
@@ -734,11 +740,22 @@ LayerPopup {
           // out and not back yet — see popup.busy for why it waits first
           Working {
             id: busyDots
-            anchors.right: parent.right
-            anchors.rightMargin: 16
+            anchors.right: queryClear.left
+            anchors.rightMargin: 8
             anchors.verticalCenter: parent.verticalCenter
             running: popup.busy && popup.rows.length > 0
             ink: Zenon.magenta
+          }
+
+          // a click on the × empties the line, as esc does (Picasso's)
+          ClearChip {
+            id: queryClear
+            anchors.right: parent.right
+            anchors.rightMargin: 14
+            anchors.verticalCenter: parent.verticalCenter
+            size: Zenon.px(15)
+            opacity: inputBar.height / 36
+            onClicked: searchInput.text = ""
           }
         }
 

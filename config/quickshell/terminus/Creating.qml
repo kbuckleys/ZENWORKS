@@ -266,5 +266,12 @@ Item {
       }, rows.length > 1 ? rows : []);
   }
   // The search sheet — see collEdit.askSearch. "" reopens on the last one.
-  function beginSearch(mode) { term.collEditRef.askSearch(mode); }
+  // names are searched as you type, on the bar (Chrome's liveInline);
+  // contents, and refining a contents search or a refined one, ask the sheet
+  function beginSearch(mode) {
+    const s = term.searchPage ? term.searchSpec : null;
+    if (mode === "grep" || (mode === "" && s && (s.kind !== "find" || (s.rules || []).length > 0)))
+      term.collEditRef.askSearch(mode);
+    else term.chromeRef.liveSearch();
+  }
 }

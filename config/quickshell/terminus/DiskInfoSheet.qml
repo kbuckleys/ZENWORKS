@@ -285,6 +285,7 @@ Rectangle {
           width: parent.width
           height: diskInfoSheet.factH
           Text {
+            textFormat: Text.PlainText
             id: factKey
             anchors.left: parent.left
             anchors.leftMargin: 20
@@ -297,6 +298,7 @@ Rectangle {
             font.pixelSize: Zenon.px(14)
           }
           Text {
+            textFormat: Text.PlainText
             anchors.left: factKey.right
             anchors.right: parent.right
             anchors.rightMargin: 20

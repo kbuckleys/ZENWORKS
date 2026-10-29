@@ -424,6 +424,12 @@ module.exports = {
     t.has("repeats are counted, not listed", B.pollers.text, "hyprctl \u00d75");
     t.eq("errors are bad", B.log.level, "bad");
     t.eq("no output at all did not run", T.readCheckup("", 1).tests.text, "did not run");
+    // hyprland's configerrors answers [""] when clean
+    t.eq("a clean hyprland config is ok", T.readCheckup('hyprerr\t[\t""]\nhyprdep\t[]\n', 1).hypr.level, "ok");
+    const D = T.readCheckup('hyprerr\t[""]\nhyprdep\t["hl.dsp.group.lock_active(): use group.lock()"]\n', 1).hypr;
+    t.eq("a deprecation is a warning", [D.level, D.detail], ["warn", "hl.dsp.group.lock_active(): use group.lock()"]);
+    t.eq("a config error is bad", T.readCheckup('hyprerr\t["base.lua:3: oops"]\nhyprdep\t[]\n', 1).hypr.level, "bad");
+    t.eq("garbage is unreadable", T.readCheckup("hyprerr\tnope\n", 1).hypr.text, "unreadable");
     // and each that wants it, its fix (OracleWindow.healthFix)
     t.eq("a clean run offers nothing to fix", Object.keys(G).filter((k) => G[k].fix).length, 0);
     t.eq("changed scripts: restart", B.stale.fix.act, "restart");

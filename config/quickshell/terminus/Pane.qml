@@ -907,10 +907,10 @@ QtObject {
     const v = pane.view;
     if (i < 0 || i >= v.length) return "";
     const here = Terminus.groupLabel(v[i], pane.sortBy,
-                                     term.tagMarks, term.nowSec);
+                                     term.tagMarks, term.nowSec, term.dirsFirst);
     if (here === "" || i === 0) return here;
     const above = Terminus.groupLabel(v[i - 1], pane.sortBy,
-                                      term.tagMarks, term.nowSec);
+                                      term.tagMarks, term.nowSec, term.dirsFirst);
     return above === here ? "" : here;
   }
 

@@ -25,9 +25,12 @@ hl.bind("SUPER + SHIFT + L", function ()
         end
     end
 
-	if workspace.special then
-		hl.workspace_rule({ workspace = tostring(workspace.name), layout = next_layout })
-	else
-		hl.workspace_rule({ workspace = tostring(workspace.id), layout = next_layout })
+	-- the rule's selector: a numbered workspace is its number, a special one
+	-- "special:x" (both its address); a named one has no id since 0.57 and
+	-- is selected as "name:x"
+	local selector = workspace.addressable_name
+	if not workspace.special and workspace.id == nil then
+		selector = "name:" .. selector
 	end
+	hl.workspace_rule({ workspace = selector, layout = next_layout })
 end)

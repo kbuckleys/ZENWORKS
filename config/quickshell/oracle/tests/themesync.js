@@ -99,6 +99,7 @@ module.exports = {
     t.match("the focused border at 65%", lh, /\bactive_border\s+= "#9ca0b0a6"/);
     t.match("the groupbar's text is the ink on an accent", lh, /groupbar_text\s+= "#eff1f5"/);
     t.ok("no slot came out undefined", !/undefined|NaN/.test(lh));
+    t.match("a rule border is a focused and an unfocused pair", lh, /rule_green\s+= "#40a02bbf #40a02b59"/);
     t.ok("the lua parses", (() => {
       try {
         require("child_process").execFileSync("luac", ["-p", "-"], { input: lh });
@@ -132,6 +133,16 @@ module.exports = {
        "globinclude theme.conf", "globinclude custom.conf"]);
     t.match("corner: the number, in a table", S.renderCornerLua(12), /^return \{ rounding = 12 \}$/m);
     t.match("corner: 0 is square", S.renderCornerLua(0), /rounding = 0 \}/);
+    const fr = S.renderFrostLua("acrylic", { r: 1, g: 0.5, b: 0 }, { r: 0, g: 0, b: 1 });
+    t.match("frost: the variant", fr, /^\tvariant = "acrylic",$/m);
+    t.match("frost: acrylic's tint is the accent at 8%", fr, /^\ttint    = "rgba\(255,128,0,0\.08\)",$/m);
+    t.match("frost: aurora's second curtain is the second hue", fr, /^\taurora2 = "rgba\(0,0,255,0\.48\)",$/m);
+    t.match("frost: a moving variant is kept", S.renderFrostLua("water", {}, {}), /variant = "water"/);
+    t.match("frost: an unknown one is plain", S.renderFrostLua("lava", {}, {}), /variant = "kawase"/);
+    t.ok("frost: the lua parses", (() => {
+      try { require("child_process").execFileSync("luac", ["-p", "-"], { input: fr }); return true; }
+      catch (e) { return e.code === "ENOENT"; }
+    })());
     t.match("corner: no number is 0, a fraction rounded", S.renderCornerLua("x") + S.renderCornerLua(4.6), /rounding = 0 \}[\s\S]*rounding = 5 \}/);
     const fx = S.renderFcitxTheme({ name: "Latte", card: "#e6e9ef", border: "#ccd0da", ink: "#4c4f69", cyan: "#179299" });
     t.match("fcitx: the panel is the card", fx, /^\[InputPanel\/Background\]\nColor=#e6e9ef\nBorderColor=#ccd0da$/m);

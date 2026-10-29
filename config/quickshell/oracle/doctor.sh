@@ -41,6 +41,12 @@ printf 'stale\t%s\n' "$(find . -name '*.js' -not -path './scripts/*' -not -path 
 printf 'stack\t%s\n' "$(sh scripts/stack.sh 2>/dev/null)"
 printf 'stamp\t%s\n' "$(head -1 "${XDG_CACHE_HOME:-$HOME/.cache}/quickshell/preflight-stamp" 2>/dev/null)"
 
+# Hyprland's own complaints about the config: errors, and what the running
+# Hyprland calls deprecated (0.57's deprecated-config) — the next release's
+# breakage, announced while the old form still works. JSON on one line.
+printf 'hyprerr\t%s\n' "$(hyprctl -j configerrors 2>/dev/null | tr -d '\n\t')"
+printf 'hyprdep\t%s\n' "$(hyprctl -j deprecated-config 2>/dev/null | tr -d '\n\t')"
+
 # The tools the shell calls out to, by the names oracle hands in (the list,
 # with what each is for and where it comes from, is oracle.js TOOLS):
 # name:1 if it is on PATH, name:0 if not; a py:NAME python module, if

@@ -505,6 +505,7 @@ Item {
             border.width: on ? 1 : 0
             border.color: Zenon.cyan
             Text {
+              textFormat: Text.PlainText
               anchors.centerIn: parent
               text: modelData[1]
               color: on ? Zenon.cyan : Zenon.white
@@ -623,6 +624,7 @@ Item {
             width: 32; height: 32; radius: Zenon.windowRadius
             color: urMa.pressed && can ? Zenon.wash(0.06) : "transparent"
             Text {
+              textFormat: Text.PlainText
               anchors.centerIn: parent
               text: modelData[0]
               color: can ? Zenon.white : Zenon.accentMuted

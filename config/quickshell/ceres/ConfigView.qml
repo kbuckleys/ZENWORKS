@@ -780,6 +780,7 @@ Item {
         width: se.avail
         spacing: 8
         Text {
+          textFormat: Text.PlainText
           width: sr.inline ? 88 : se.avail
           height: sr.inline ? 32 : 22
           verticalAlignment: Text.AlignVCenter

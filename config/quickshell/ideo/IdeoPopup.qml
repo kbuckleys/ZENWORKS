@@ -495,7 +495,10 @@ LayerPopup {
           }
 
           Row {
-            anchors.fill: parent
+            anchors.left: parent.left
+            anchors.right: queryClear.left
+            anchors.rightMargin: 8
+            height: parent.height
             visible: inputBar.height > 2
             leftPadding: 16
             spacing: 12
@@ -517,7 +520,7 @@ LayerPopup {
             }
 
             Item {
-              width: parent.width - modeLabel.width - 60
+              width: parent.width - modeLabel.width - 44
               height: parent.height
 
               TextInput {
@@ -560,6 +563,17 @@ LayerPopup {
                 }
               }
             }
+          }
+
+          // a click on the × empties the filter, as esc does (Picasso's)
+          ClearChip {
+            id: queryClear
+            anchors.right: parent.right
+            anchors.rightMargin: 14
+            anchors.verticalCenter: parent.verticalCenter
+            size: Zenon.px(15)
+            visible: inputBar.height > 2
+            onClicked: filterInput.text = ""
           }
         }
 

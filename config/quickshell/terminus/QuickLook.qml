@@ -1372,6 +1372,7 @@ PanelWindow {
               bottomPadding: Math.round(10 * root.zoom)
 
               Text {
+                textFormat: Text.PlainText
                 text: modelData[0]
                 color: Zenon.accentKey
                 font.family: Zenon.face
@@ -1380,6 +1381,7 @@ PanelWindow {
                 font.letterSpacing: 1.2
               }
               Text {
+                textFormat: Text.PlainText
                 // As wide as it wants, up to the half. A Text's
                 // implicitWidth is its UNWRAPPED width, so capping the
                 // width with it is safe — the wrap and the cap cannot

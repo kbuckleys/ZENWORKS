@@ -235,6 +235,7 @@ Rectangle {
       if (!sendTo.open || sendTo.query.length < 2) return;
       sendTo.crawling = true;
       sendToFind.running = false;
+      sendToFind.asked = sendTo.query;
       sendToFind.command = ["sh", "-c",
         Terminus.dirFindCommand(sendTo.query)];
       sendToFind.running = true;
@@ -243,10 +244,14 @@ Rectangle {
 
   Process {
     id: sendToFind
+    // the query it was asked: a killed run still hands in its partial
+    // answer, which stayed listed under a shorter query (audit 2026-10-28d)
+    property string asked: ""
     stdout: StdioCollector {
       id: sendToFound
       waitForEnd: true
       onStreamFinished: {
+        if (sendToFind.asked !== sendTo.query) return;
         sendTo.crawling = false;
         if (!sendTo.open) return;
         const out = [];

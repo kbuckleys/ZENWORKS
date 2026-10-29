@@ -115,6 +115,14 @@ function renderHyprTheme(c) {
     ["groupbar_locked_active", hypr(c.red)],
     ["groupbar_active", hypr(c.pink)],
     ["groupbar_inactive", hypr(c.surface)],
+    // a window rule's Border (oracle's Window rules, Hyprland 0.57's
+    // active_border / inactive_border rules): the hue, full-ish focused and
+    // faint unfocused like the states above. No red: red is the urgent flash.
+    ["rule_accent", pair(c.cyan, 0.75, 0.35)],
+    ["rule_blue", pair(c.blue, 0.75, 0.35)],
+    ["rule_green", pair(c.green, 0.75, 0.35)],
+    ["rule_yellow", pair(c.yellow, 0.75, 0.35)],
+    ["rule_magenta", pair(c.magenta, 0.75, 0.35)],
   ];
   const w = Math.max.apply(null, t.map((l) => l[0].length));
   out.push("return {");
@@ -193,6 +201,33 @@ function renderCornerLua(n) {
   out.push("", "-- CORNER", "-- Written by the shell (morpheus/ThemeSync.qml) from oracle's Corner",
            "-- rounding; base.lua reads it. Edits here are overwritten.", "",
            "return { rounding = " + v + " }", "");
+  return out.join("\n");
+}
+
+// ── hyprland's blur ────────────────────────────────────────────────────
+// lua/frost.lua, read by base.lua like corner.lua: Oracle's Frost style
+// (decoration.blur.variant, Hyprland 0.57), and the colored styles in the
+// theme: acrylic's tint the accent at 8%, aurora's two curtains the accent
+// at 16% and magenta at 48%, the fluid jar the accent at 80% — the alphas
+// Hyprland's own defaults have. `accent` and `second` are { r, g, b } in
+// 0..1, as a QML color gives them. A name Hyprland does not have falls back
+// to kawase.
+var FROST_STYLES = ["kawase", "frost", "acrylic", "haze", "prism",
+                    "ripple", "water", "drops", "aurora", "heat_shimmer", "fluid_jar"];
+function renderFrostLua(style, accent, second) {
+  const v = FROST_STYLES.indexOf(String(style)) >= 0 ? String(style) : "kawase";
+  const c = (x) => Math.max(0, Math.min(255, Math.round((Number(x) || 0) * 255)));
+  const rgba = (k, a) => "rgba(" + c(k && k.r) + "," + c(k && k.g) + "," + c(k && k.b) + "," + a + ")";
+  const out = HEAD.map((l) => "-- " + l);
+  out.push("", "-- FROST", "-- Written by the shell (morpheus/ThemeSync.qml) from oracle's Frost",
+           "-- style; base.lua reads it. Edits here are overwritten.", "",
+           "return {",
+           "\tvariant = \"" + v + "\",",
+           "\ttint    = \"" + rgba(accent, 0.08) + "\",",
+           "\taurora1 = \"" + rgba(accent, 0.16) + "\",",
+           "\taurora2 = \"" + rgba(second, 0.48) + "\",",
+           "\tfluid   = \"" + rgba(accent, 0.8) + "\",",
+           "}", "");
   return out.join("\n");
 }
 

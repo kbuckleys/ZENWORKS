@@ -314,6 +314,7 @@ Item {
           anchors.verticalCenter: segs.words ? undefined : parent.verticalCenter
         }
         Text {
+          textFormat: Text.PlainText
           id: label
           anchors.centerIn: parent
           anchors.verticalCenterOffset: segs.artRoom / 2 - segs.noteRoom / 2
@@ -337,6 +338,7 @@ Item {
         // word is its glyph alone (home in the crumbs), so the gap goes too
         // and the glyph sits centered.
         Text {
+          textFormat: Text.PlainText
           id: mark
           readonly property real gap: label.text !== "" ? 7 : 0
           readonly property real room: mark.text !== "" ? mark.implicitWidth + gap : 0
@@ -352,6 +354,7 @@ Item {
           font.pixelSize: Math.round(segs.textSize * 1.05)
         }
         Text {
+          textFormat: Text.PlainText
           visible: one.modelData.length > 2 && !!one.modelData[2]
           anchors.top: label.bottom
           anchors.topMargin: 2

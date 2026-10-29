@@ -69,7 +69,12 @@ FloatingWindow {
     aw.cropping = false;
     aw.probeW = 0;
     aw.probeH = 0;
+    // the same file again: its length does not change, so the cut and the
+    // strip would wait on onDurationChanged for good (0→0, no frames;
+    // audit 2026-10-28d)
+    const again = String(player.source) === Strings.fileUrl(p) && player.duration > 0;
     player.source = Strings.fileUrl(p);
+    if (again) { aw.outMs = player.duration; aw.makeStrip(); }
     factsProc.command = ["ffprobe", "-v", "error", "-select_streams", "v:0",
       "-show_entries", "stream=width,height,r_frame_rate:format=size,duration", "-of", "json", p];
     factsProc.running = true;
@@ -224,7 +229,7 @@ FloatingWindow {
       waitForEnd: true
       onStreamFinished: {
         const p = nameOut.text.trim();
-        if (p === "") { aw.saving = false; aw.say(out === "" ? "No free name beside the original — use Save as…" : "No free name for it — pick another in Save as…", true); return; }
+        if (p === "") { aw.saving = false; aw.say(aw.savingTo === "" ? "No free name beside the original — use Save as…" : "No free name for it — pick another in Save as…", true); return; }
         aw.runSave(p);
       }
     }

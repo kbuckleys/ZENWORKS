@@ -612,7 +612,7 @@ Item {
       anchors.verticalCenter: parent.verticalCenter
       // the line in the accent's ink (the mode's ink outside normal mode), the column
       // a step back: the line is what you navigate by
-      Text { anchors.verticalCenter: parent.verticalCenter; font: bar.font; color: bar.tinted ? bar.modeInk : Zenon.accentInk; text: bar.ed.line }
+      Text { textFormat: Text.PlainText; anchors.verticalCenter: parent.verticalCenter; font: bar.font; color: bar.tinted ? bar.modeInk : Zenon.accentInk; text: bar.ed.line }
       Text { anchors.verticalCenter: parent.verticalCenter; font: bar.font; color: Zenon.accentMuted; text: ":" + bar.ed.column }
       Text { anchors.verticalCenter: parent.verticalCenter; font: bar.font; color: bar.tinted ? Zenon.white : Zenon.accentMuted; text: "  " + bar.ed.lines }
     }

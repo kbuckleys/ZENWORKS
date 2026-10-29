@@ -424,7 +424,12 @@ Item {
       }
       rowMouse.lastPress = now;
       rowMouse.lastPath = here;
+      // a plain press is never the release behind an open: a row whose
+      // open was cancelled (the list rebuilt under the press, the delegate
+      // reused) swallowed its next click (audit 2026-10-28d)
+      rowMouse.opening = false;
     }
+    onCanceled: rowMouse.opening = false
 
     onClicked: (m) => {
       // a gesture that became a drag is not also a click

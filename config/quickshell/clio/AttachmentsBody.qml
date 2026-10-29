@@ -118,11 +118,11 @@ Item {
         x: 6
         anchors.verticalCenter: parent.verticalCenter
         spacing: 12
-        Text { anchors.verticalCenter: parent.verticalCenter; text: Icons.glyphFor({ name: modelData.b.name || "" }) || ""; color: Zenon.cyan; font.family: Zenon.glyphFace; font.pixelSize: Zenon.px(18) }
+        Text { textFormat: Text.PlainText; anchors.verticalCenter: parent.verticalCenter; text: Icons.glyphFor({ name: modelData.b.name || "" }) || ""; color: Zenon.cyan; font.family: Zenon.glyphFace; font.pixelSize: Zenon.px(18) }
         Column {
           anchors.verticalCenter: parent.verticalCenter
-          Text { text: modelData.b.name || "file"; color: Zenon.ink; font.family: Zenon.face; font.weight: Font.DemiBold; font.pixelSize: Zenon.px(14) }
-          Text { text: N.sizeText(modelData.b.size) + "  ·  in " + N.titleOf(modelData.note, "an entry"); color: Zenon.accentMuted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(12) }
+          Text { textFormat: Text.PlainText; text: modelData.b.name || "file"; color: Zenon.ink; font.family: Zenon.face; font.weight: Font.DemiBold; font.pixelSize: Zenon.px(14) }
+          Text { textFormat: Text.PlainText; text: N.sizeText(modelData.b.size) + "  ·  in " + N.titleOf(modelData.note, "an entry"); color: Zenon.accentMuted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(12) }
         }
       }
       MouseArea {

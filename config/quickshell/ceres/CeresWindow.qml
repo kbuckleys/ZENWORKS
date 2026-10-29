@@ -1415,6 +1415,7 @@ FloatingWindow {
     border.width: 1
     border.color: vrow.back ? Zenon.yellow : Zenon.border
     Text {
+      textFormat: Text.PlainText
       anchors.left: parent.left
       anchors.leftMargin: 12
       anchors.verticalCenter: parent.verticalCenter
@@ -1462,6 +1463,9 @@ FloatingWindow {
     { key: "oldcode", title: "Running old code" },
     { key: "aurhealth", title: "AUR health" }
   ].concat(Ceres.deps.flatpak ? [{ key: "flatpak", title: "Flatpak" }] : [])
+  // Flatpak's item, the last, gone while it was the one chosen: the pane
+  // read past the end and broke (audit 2026-10-28d)
+  onMaintItemsChanged: if (win.msel >= win.maintItems.length) win.msel = win.maintItems.length - 1
   // how many things want doing, for the tab's label
   readonly property int maintCount: !win.maint ? 0
     : (win.maint.orphans.length ? 1 : 0) + (win.maint.pacnew.length ? 1 : 0)
@@ -3202,6 +3206,7 @@ FloatingWindow {
                 required property var modelData
                 spacing: 12
                 Text {
+                  textFormat: Text.PlainText
                   width: cacheFacts.labelW
                   text: modelData[0]
                   color: Zenon.accentKey
@@ -3210,6 +3215,7 @@ FloatingWindow {
                   font.pixelSize: Zenon.px(16)
                 }
                 Text {
+                  textFormat: Text.PlainText
                   text: modelData[1].n === 0 ? "None"
                     : modelData[1].n + (modelData[1].n === 1 ? " file" : " files")
                       + (modelData[1].size ? " · " + modelData[1].size : "")
@@ -3252,6 +3258,7 @@ FloatingWindow {
                 required property var modelData
                 spacing: 12
                 Text {
+                  textFormat: Text.PlainText
                   width: mirrorFacts.labelW
                   text: modelData[0]
                   color: Zenon.accentKey
@@ -3260,6 +3267,7 @@ FloatingWindow {
                   font.pixelSize: Zenon.px(16)
                 }
                 Text {
+                  textFormat: Text.PlainText
                   // a long host and its answer time ran off the window's edge
                   width: mirrorFacts.width - mirrorFacts.labelW - 12
                   elide: Text.ElideRight
@@ -3845,6 +3853,7 @@ FloatingWindow {
                 spacing: 12
                 readonly property bool link: /^https?:\/\//.test(frow.modelData[1])
                 Text {
+                  textFormat: Text.PlainText
                   width: 150
                   text: frow.modelData[0]
                   color: Zenon.accentMuted
@@ -3853,6 +3862,7 @@ FloatingWindow {
                   font.pixelSize: Zenon.px(16)
                 }
                 Text {
+                  textFormat: Text.PlainText
                   width: frow.width - 162
                   wrapMode: Text.Wrap
                   text: frow.modelData[1]
@@ -3863,7 +3873,7 @@ FloatingWindow {
                   HoverHandler { id: linkHov; enabled: frow.link; cursorShape: Qt.PointingHandCursor }
                   TapHandler {
                     enabled: frow.link
-                    onTapped: Quickshell.execDetached(["xdg-open", frow.modelData[1]])
+                    onTapped: Strings.openLink(frow.modelData[1])
                   }
                 }
               }
@@ -5371,6 +5381,7 @@ FloatingWindow {
                 font.pixelSize: Zenon.px(ent.modelData.target ? 17 : 16)
               }
               Text {
+                textFormat: Text.PlainText
                 visible: !ent.modelData.head
                 anchors.left: entName.right
                 anchors.leftMargin: 8

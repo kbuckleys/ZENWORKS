@@ -966,6 +966,7 @@ FloatingWindow {
     win.dupesBusy = true;
     win.dupeGot = ({});
     dupeProc.rows = need;
+    dupeProc.dir = win.dir;
     dupeProc.done = 0;
     win.say("Comparing " + rows.length + " pictures…", 600000);
     dupeProc.command = ["sh", "-c", V.dhashCommand(), "sh"].concat(need.map((r) => r.path));
@@ -984,10 +985,14 @@ FloatingWindow {
         if (dupeProc.done % 20 === 0) win.say("Comparing  \u00b7  " + dupeProc.done + " of " + dupeProc.rows.length + " read", 600000);
       }
     }
+    // the directory it compared: one finished after you had moved on took
+    // the new directory over with the old one's groups (audit 2026-10-28d)
+    property string dir: ""
     onExited: {
       win.mgr.noteHashes(win.dupeGot, dupeProc.rows);
       win.dupesBusy = false;
-      win.showDupes();
+      if (dupeProc.dir === win.dir) win.showDupes();
+      else win.say("Compared — the pictures are remembered for that directory", 4000);
     }
   }
   function showDupes() {
@@ -1027,6 +1032,9 @@ FloatingWindow {
     win.filterOpen = false;
     win.compare = false;
     win.cmpPath = "";
+    // and its alike pictures: kept, they filtered the next directory down
+    // to the old one's groups — nothing (audit 2026-10-28d)
+    win.dupes = null;
   }
 
   function list() {
@@ -6006,6 +6014,7 @@ FloatingWindow {
             required property var modelData
             spacing: 12
             Text {
+              textFormat: Text.PlainText
               width: 104
               text: modelData.k
               color: Zenon.accentMuted
@@ -6014,6 +6023,7 @@ FloatingWindow {
               font.pixelSize: Zenon.px(14)
             }
             Text {
+              textFormat: Text.PlainText
               width: infoCol.width - 116
               text: modelData.v
               color: modelData.url || modelData.mapAt ? (linkMa.containsMouse ? Zenon.cyan : Zenon.link)

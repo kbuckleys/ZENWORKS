@@ -138,6 +138,7 @@ Item {
                 font.pixelSize: Zenon.px(15)
               }
               Text {
+                textFormat: Text.PlainText
                 width: parent.width
                 wrapMode: Text.Wrap
                 maximumLineCount: 2

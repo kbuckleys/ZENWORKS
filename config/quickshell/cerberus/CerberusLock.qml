@@ -76,24 +76,33 @@ Scope {
   // from interleaving.
   readonly property string blurSave: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/cerberus-blur"
 
-  function hyprBlur(size, passes) {
+  // `variant` too since Hyprland 0.57's blur styles: "" leaves it alone
+  function hyprBlur(size, passes, variant) {
     return "hyprctl -q eval \"hl.config({ decoration = { blur = { size = " + size
-      + ", passes = " + passes + " } } })\"";
+      + ", passes = " + passes + (variant !== undefined && variant !== "" ? ", variant = " + variant : "")
+      + " } } })\"";
   }
 
   // whether the raise is owed: a `hyprctl reload` (ThemeSync's phase change,
   // Oracle) puts base.lua's everyday blur back under a standing lock
   property bool frosted: false
 
+  // A FROST STYLE THAT MOVES (Oracle's Frost style: water, aurora …) would
+  // keep redrawing the whole screen behind the lock for as long as it is
+  // locked, at the lock's heavier blur. The lock swaps it for plain kawase
+  // (0) and puts it back with the rest; a still style is kept as it is.
   function frost(on) {
     root.frosted = on;
     const f = Strings.shellQuote(root.blurSave);
     const opt = (o) => "$(hyprctl getoption decoration:blur:" + o + " | awk 'NR==1{print $2}')";
     const script = on
-      ? "[ -f " + f + " ] || echo \"" + opt("size") + " " + opt("passes") + "\" > " + f + "; "
-        + root.hyprBlur(root.frostSize, Math.max(1, Oracle.lockFrost))
-      : "[ -f " + f + " ] || exit 0; read s p < " + f + "; "
-        + "[ -n \"$p\" ] && " + root.hyprBlur("$s", "$p") + "; rm -f " + f;
+      ? "[ -f " + f + " ] || echo \"" + opt("size") + " " + opt("passes") + " " + opt("variant") + "\" > " + f + "; "
+        + root.hyprBlur(root.frostSize, Math.max(1, Oracle.lockFrost), Oracle.frostMoves ? "0" : "")
+      // a save from before 0.57's styles has no third field: the style
+      // there now is put back as it is
+      : "[ -f " + f + " ] || exit 0; read s p v < " + f + "; "
+        + "[ -n \"$v\" ] || v=" + opt("variant") + "; "
+        + "[ -n \"$p\" ] && " + root.hyprBlur("$s", "$p", "$v") + "; rm -f " + f;
     Quickshell.execDetached(["flock", root.blurSave + ".lock", "sh", "-c", script]);
   }
 

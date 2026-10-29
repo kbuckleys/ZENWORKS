@@ -311,6 +311,7 @@ Item {
                     width: col.width
                     spacing: 24
                     Text {
+                      textFormat: Text.PlainText
                       id: factKey
                       width: pc.keyWidth
                       elide: Text.ElideRight
@@ -326,6 +327,7 @@ Item {
                       width: fact.width - factKey.width - fact.spacing
                       spacing: 2
                       Text {
+                        textFormat: Text.PlainText
                         visible: !fact.hasBar
                         width: parent.width
                         elide: Text.ElideRight
@@ -349,6 +351,7 @@ Item {
                         fontSize: 13
                       }
                       Text {
+                        textFormat: Text.PlainText
                         visible: !!fact.modelData.note
                         width: parent.width
                         elide: Text.ElideRight

@@ -1371,6 +1371,7 @@ Variants {
                   color: fmtPress.pressed ? Zenon.wash(0.16) : "transparent"
 
                   Text {
+                    textFormat: Text.PlainText
                     anchors.centerIn: parent
                     text: fmt.modelData[0]
                     color: Zenon.white
@@ -1439,6 +1440,7 @@ Variants {
                   }
 
                   Text {
+                    textFormat: Text.PlainText
                     id: stepGlyph
                     anchors.centerIn: parent
                     text: step.modelData[0]

@@ -227,6 +227,7 @@ Item {
                 radius: Zenon.radiusControl
                 color: Zenon.alpha(side.modelData[0] === "ours" ? Zenon.cyan : Zenon.magenta, 0.08)
                 Text {
+                  textFormat: Text.PlainText
                   id: sideText
                   x: 8
                   y: 5

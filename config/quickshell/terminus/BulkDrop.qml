@@ -306,6 +306,7 @@ Item {
         bottomRightRadius: bottomLeftRadius
 
         Text {
+          textFormat: Text.PlainText
           anchors.left: parent.left
           anchors.leftMargin: 12
           anchors.right: parent.right

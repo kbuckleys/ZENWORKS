@@ -20,6 +20,8 @@ Column {
   property var term: null
   readonly property alias gridA: gridA
   readonly property alias searchBar: searchBar
+  readonly property alias liveField: liveField
+  function liveSearch() { liveInline.begin(); }
   readonly property alias jobsToggle: jobsToggle
   readonly property alias gridB: gridB
   readonly property alias listA: listA
@@ -332,7 +334,7 @@ Column {
       // the toggle's own leftMargin, so it sits centered between the two.
       // 12 from the window's edge when there is no button before it.
       anchors.leftMargin: (sideToggle.shown || navButtons.visible) ? 6 : 12
-      anchors.right: filterInline.left
+      anchors.right: liveInline.left
       anchors.rightMargin: 12
       anchors.verticalCenter: crumbInner.verticalCenter
       height: crumbInner.height
@@ -722,6 +724,121 @@ Column {
           filterField.text = "";
           term.act.query = "";
           term.contentRef.forceActiveFocus();
+        }
+      }
+    }
+
+    // ── SEARCH AS YOU TYPE (user, 2026-10-29: "just like artemis") ──
+    // `s` opens this field on the bar; every pause in the typing runs the
+    // name search (fd + fzf, Terminus.findCommand — Artemis' recipe) over
+    // the directory you asked from, in a tab of its own as the sheet's did,
+    // and SearchBar's where / what / + / Save stand under the bar as soon as
+    // there are results. Contents (`S`) and refinements keep the sheet.
+    Row {
+      id: liveInline
+      // open while typing, and on a names search's page so its question can
+      // be changed in place
+      property bool open: false
+      // a tab is being opened for the first keystroke: the next ones wait
+      // for it rather than each opening another
+      property bool opening: false
+      readonly property var spec: term.searchPage ? term.searchSpec : null
+      readonly property bool shown: liveInline.open
+        || (!!liveInline.spec && liveInline.spec.kind === "find")
+      function begin() {
+        liveInline.open = true;
+        if (!liveField.activeFocus)
+          liveField.text = liveInline.spec && liveInline.spec.kind === "find" ? liveInline.spec.query : "";
+        liveField.forceActiveFocus();
+        liveField.selectAll();
+      }
+      function run() {
+        const q = liveField.text.trim();
+        if (q === "" || liveInline.opening) return;
+        const s = liveInline.spec;
+        if (s) {
+          if (s.kind === "find" && s.query === q) return;
+          term.respec({ query: q });
+          return;
+        }
+        const spec = { kind: "find", query: q, root: term.cwd, rules: [] };
+        term.lastSearch = { kind: "find", query: q, root: term.cwd, rules: [] };
+        liveInline.opening = true;
+        term.openRealmInNewTab(() => {
+          term.searchSpec = spec;
+          term.search("find", q);
+          liveInline.opening = false;
+          liveField.forceActiveFocus();
+          // typed on while the tab opened: catch up
+          if (liveField.text.trim() !== q) liveTyped.restart();
+        });
+      }
+      function leave(back) {
+        liveTyped.stop();
+        liveInline.open = false;
+        if (back && term.searchPage) term.clearSearch();
+        term.contentRef.forceActiveFocus();
+      }
+      anchors.right: filterInline.left
+      anchors.rightMargin: liveInline.shown ? 14 : 0
+      anchors.verticalCenter: crumbInner.verticalCenter
+      spacing: 6
+      visible: liveInline.shown
+      opacity: crumbBar.chromeInk
+      // a tab stepped to: the field says that tab's question
+      onSpecChanged: if (!liveField.activeFocus) liveField.text = liveInline.spec ? liveInline.spec.query : "";
+
+      Timer { id: liveTyped; interval: 160; onTriggered: liveInline.run() }
+
+      Text {
+        anchors.verticalCenter: parent.verticalCenter
+        text: "\uF002"
+        color: Zenon.cyan
+        font.family: Zenon.face
+        font.weight: Zenon.weight
+        font.pixelSize: Zenon.px(15)
+      }
+
+      TextInput {
+        id: liveField
+        anchors.verticalCenter: parent.verticalCenter
+        width: Math.max(120, Math.min(260, contentWidth + 2))
+        color: Zenon.cyan
+        selectionColor: Zenon.cyan
+        selectedTextColor: Zenon.onAccent
+        font.family: Zenon.face
+        font.weight: Zenon.weight
+        font.pixelSize: Zenon.px(17)
+        clip: true
+        onTextChanged: if (activeFocus) liveTyped.restart()
+        onActiveFocusChanged: if (!activeFocus && text.trim() === "" && !liveInline.opening) liveInline.open = false
+        Keys.onEscapePressed: (e) => { e.accepted = true; liveInline.leave(true); }
+        Keys.onReturnPressed: (e) => {
+          e.accepted = true;
+          liveTyped.stop();
+          liveInline.run();
+          liveInline.open = false;
+          term.contentRef.forceActiveFocus();
+        }
+        Keys.onDownPressed: (e) => { e.accepted = true; liveInline.open = false; term.contentRef.forceActiveFocus(); }
+        Text {
+          visible: liveField.text === ""
+          anchors.verticalCenter: parent.verticalCenter
+          textFormat: Text.PlainText
+          text: "Search names"
+          color: Zenon.accentMuted
+          font: liveField.font
+        }
+        cursorDelegate: Caret { field: liveField }
+      }
+
+      ClearChip {
+        anchors.verticalCenter: parent.verticalCenter
+        size: Zenon.px(15)
+        shown: liveField.text !== ""
+        onClicked: {
+          liveField.text = "";
+          liveInline.leave(true);
         }
       }
     }
@@ -1810,6 +1927,11 @@ Column {
                 function onStatusChanged() {
                   if (shot.status === Image.Ready) mediaClip.takeAspect();
                 }
+                // a picture already in Qt's cache goes Ready to Ready with no
+                // status change, and kept the last one's shape (audit
+                // 2026-10-28d): its size changing says so instead
+                function onImplicitWidthChanged() { if (shot.status === Image.Ready) mediaClip.takeAspect(); }
+                function onImplicitHeightChanged() { if (shot.status === Image.Ready) mediaClip.takeAspect(); }
               }
               width: Math.max(1, Math.min(media.boxW, media.boxH * mediaClip.ar))
               height: Math.max(1, Math.min(media.boxH, media.boxW / mediaClip.ar))
@@ -2036,6 +2158,7 @@ Column {
                 spacing: 10
 
                 Text {
+                  textFormat: Text.PlainText
                   // WIDE ENOUGH FOR THE LONGEST LABEL THERE ACTUALLY IS,
                   // which is "longest line" and not "frame rate" — the
                   // text rows were added after this number was chosen.
@@ -2054,6 +2177,7 @@ Column {
                 }
 
                 Text {
+                  textFormat: Text.PlainText
                   width: media.width - facts.labelW - 10
                   height: parent.height
                   verticalAlignment: Text.AlignVCenter

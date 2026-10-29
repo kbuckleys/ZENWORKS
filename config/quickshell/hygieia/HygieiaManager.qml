@@ -51,10 +51,18 @@ Scope {
   // ── WHAT IS KNOWN ──────────────────────────────────────────────────
   property var overview: H.parseOverview("")
   property bool scanning: false
+  // asked while one is out (a trash or delete just done): asked again once
+  // it lands, which was counted before the files moved (audit 2026-10-28d)
+  property bool scanAgain: false
   function scan() {
-    if (mgr.scanning) return;
+    if (mgr.scanning) { mgr.scanAgain = true; return; }
     mgr.scanning = true;
-    mgr.ask(["overview"], (t) => { mgr.overview = H.parseOverview(t); mgr.scanning = false; });
+    mgr.scanAgain = false;
+    mgr.ask(["overview"], (t) => {
+      mgr.overview = H.parseOverview(t);
+      mgr.scanning = false;
+      if (mgr.scanAgain) Qt.callLater(mgr.scan);
+    });
   }
   property var dupes: []
   property bool dupesAsked: false

@@ -30,6 +30,10 @@ Item {
   // go there. Handed in by shell.qml — howler's critical color, the one ink
   // the shell already uses for "look at this".
   property color urgentInk: Zenon.red
+  // one blink of a flash, in and out: the urgent wash's pairs, the special
+  // mark's and the system bell's alike
+  readonly property int blinkIn: 60
+  readonly property int blinkOut: 120
 
   readonly property var specialWorkspace: {
     var values = Hyprland.workspaces.values;
@@ -41,12 +45,29 @@ Item {
 
   // monitor-agnostic: any special focused on any monitor counts
   property string _activeSpecialName: ""
+  // THE SYSTEM BELL (a terminal's BEL; Hyprland 0.57's socket2 `bell>>addr`):
+  // howler plays the sound, and the ringing window's workspace blinks once
+  // in the accent — never red, red is urgent — when it is not the one you
+  // are on. bellSeq counts rings, so the same workspace can blink again.
+  property var bellWorkspace: null
+  property int bellSeq: 0
+  function _ring(data) {
+    const norm = (a) => String(a || "").toLowerCase().replace(/^0x/, "");
+    const a = norm(data);
+    if (a === "") return;
+    const tl = Hyprland.toplevels.values.find((t) => norm(t.address) === a);
+    if (!tl || !tl.workspace || tl.workspace.focused) return;
+    root.bellWorkspace = tl.workspace;
+    root.bellSeq++;
+  }
   Connections {
     target: Hyprland
     function onRawEvent(event) {
       if (event.name === "activespecial") {
         const parts = String(event.data).split(",");
         root._activeSpecialName = parts[0] ? parts[0].trim() : "";
+      } else if (event.name === "bell") {
+        root._ring(event.data);
       }
     }
   }
@@ -79,10 +100,10 @@ Item {
   SequentialAnimation on specialFlash {
     running: root.specialUrgent
     loops: Animation.Infinite
-    NumberAnimation { to: 1; duration: 60; easing.type: Easing.OutQuad }
-    NumberAnimation { to: 0; duration: 120; easing.type: Easing.InQuad }
-    NumberAnimation { to: 1; duration: 60; easing.type: Easing.OutQuad }
-    NumberAnimation { to: 0; duration: 120; easing.type: Easing.InQuad }
+    NumberAnimation { to: 1; duration: root.blinkIn; easing.type: Easing.OutQuad }
+    NumberAnimation { to: 0; duration: root.blinkOut; easing.type: Easing.InQuad }
+    NumberAnimation { to: 1; duration: root.blinkIn; easing.type: Easing.OutQuad }
+    NumberAnimation { to: 0; duration: root.blinkOut; easing.type: Easing.InQuad }
     PauseAnimation { duration: 640 }
   }
   onSpecialUrgentChanged: if (!root.specialUrgent) root.specialFlash = 0
@@ -270,11 +291,39 @@ Item {
               SequentialAnimation on flash {
                 running: btn.isUrgent
                 loops: Animation.Infinite
-                NumberAnimation { to: 1; duration: 60; easing.type: Easing.OutQuad }
-                NumberAnimation { to: 0; duration: 120; easing.type: Easing.InQuad }
-                NumberAnimation { to: 1; duration: 60; easing.type: Easing.OutQuad }
-                NumberAnimation { to: 0; duration: 120; easing.type: Easing.InQuad }
+                NumberAnimation { to: 1; duration: root.blinkIn; easing.type: Easing.OutQuad }
+                NumberAnimation { to: 0; duration: root.blinkOut; easing.type: Easing.InQuad }
+                NumberAnimation { to: 1; duration: root.blinkIn; easing.type: Easing.OutQuad }
+                NumberAnimation { to: 0; duration: root.blinkOut; easing.type: Easing.InQuad }
                 PauseAnimation { duration: 640 }
+              }
+            }
+
+            // the system bell's one blink (root.bellSeq): the urgent wash's
+            // first pair, once, in the accent
+            Rectangle {
+              id: bellWash
+              z: -1
+              anchors.centerIn: parent
+              width: urgentWash.width
+              height: urgentWash.height
+              radius: urgentWash.radius
+              color: Zenon.cyan
+              property real flash: 0
+              opacity: btn.isUrgent ? 0 : bellWash.flash
+              visible: opacity > 0.01
+              SequentialAnimation {
+                id: bellBlink
+                NumberAnimation { target: bellWash; property: "flash"; to: 1; duration: root.blinkIn; easing.type: Easing.OutQuad }
+                NumberAnimation { target: bellWash; property: "flash"; to: 0; duration: root.blinkOut; easing.type: Easing.InQuad }
+                NumberAnimation { target: bellWash; property: "flash"; to: 1; duration: root.blinkIn; easing.type: Easing.OutQuad }
+                NumberAnimation { target: bellWash; property: "flash"; to: 0; duration: root.blinkOut; easing.type: Easing.InQuad }
+              }
+              Connections {
+                target: root
+                function onBellSeqChanged() {
+                  if (root.bellWorkspace === btn.modelData && !btn.isActive) bellBlink.restart();
+                }
               }
             }
 

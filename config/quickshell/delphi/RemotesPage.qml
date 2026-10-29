@@ -16,7 +16,6 @@
 //     your fork, the original upstream)
 
 import QtQuick
-import Quickshell
 import "../morpheus"
 import "../terminus"
 import "delphi.js" as D
@@ -268,7 +267,7 @@ Item {
   }
   function web(r) {
     const u = r ? pg.webOf(r.push || r.fetch) : "";
-    if (u) Quickshell.execDetached(["xdg-open", u]);
+    if (u) Strings.openLink(u);
   }
   function menuFor(r) {
     const ssh = D.protocolOf(r.fetch) === "SSH";

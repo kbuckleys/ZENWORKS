@@ -487,7 +487,10 @@ Singleton {
   property int kelvin: H.KELVIN_DEFAULT
   readonly property bool nightWanted: H.nightWanted(root.nightOn, root.nightSun, Zenon.daylight)
   readonly property bool nightActive: root.nightWanted && root.probe.display.hyprsunset
-  function setNight(on) { root.nightOn = on; if (on) root.nightSun = false; root.save(); }
+  // a hand on the switch takes over from the sun either way: off at night
+  // kept the schedule, which went on wanting it, and nothing changed
+  // (audit 2026-10-28d)
+  function setNight(on) { root.nightOn = on; root.nightSun = false; root.save(); }
   function toggleNight() { root.setNight(!root.nightWanted); }
   function setNightSun(on) { root.nightSun = on; root.save(); }
   function setKelvin(k) {

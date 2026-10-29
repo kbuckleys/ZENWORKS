@@ -176,8 +176,9 @@ Scope {
       return;
     }
     // region: straight to the overlay — nothing is captured until Save
-    const ws = [mon.activeWorkspace ? mon.activeWorkspace.id : -1,
-                mon.specialWorkspace ? mon.specialWorkspace.id : -1];
+    // a closed special workspace answers with an empty address
+    const ws = [mon.activeWorkspace, mon.specialWorkspace]
+      .map((w) => w ? String(w.address || "") : "").filter((a) => a !== "");
     cap.wins = Cap.windowsOn(clients, mon, ws);
     cap.monitor = mon;
     region.target = file;

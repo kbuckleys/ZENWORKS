@@ -309,6 +309,7 @@ FloatingWindow {
                 font.pixelSize: Zenon.px(18)
               }
               Text {
+                textFormat: Text.PlainText
                 id: name
                 anchors.left: glyph.right
                 anchors.leftMargin: 10
@@ -427,6 +428,7 @@ FloatingWindow {
             anchors.verticalCenter: limGlyph.verticalCenter
             spacing: 2
             Text {
+              textFormat: Text.PlainText
               width: parent.width
               elide: Text.ElideRight
               text: limitSheet.key !== "" ? Kairos.nameOf(limitSheet.key) : ""

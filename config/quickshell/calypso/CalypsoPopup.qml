@@ -405,8 +405,11 @@ LayerPopup {
             Behavior on height { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
             clip: true
             Row {
-              anchors.fill: parent
+              anchors.left: parent.left
               anchors.leftMargin: 16
+              anchors.right: queryClear.left
+              anchors.rightMargin: 8
+              height: parent.height
               visible: inputBar.height > 2
               Text {
                 width: 36
@@ -419,7 +422,7 @@ LayerPopup {
               }
               TextInput {
                 id: filterInput
-                width: parent.width - 52
+                width: parent.width - 36
                 height: parent.height
                 verticalAlignment: TextInput.AlignVCenter
                 color: popup.entryColor
@@ -433,6 +436,16 @@ LayerPopup {
                 Keys.forwardTo: bgRoot
                 onTextChanged: { popup.query = filterInput.text; popup.sel = 0; }
               }
+            }
+            // a click on the × empties the filter, as esc does (Picasso's)
+            ClearChip {
+              id: queryClear
+              anchors.right: parent.right
+              anchors.rightMargin: 14
+              anchors.verticalCenter: parent.verticalCenter
+              size: Zenon.px(15)
+              visible: inputBar.height > 2
+              onClicked: filterInput.text = ""
             }
           }
 

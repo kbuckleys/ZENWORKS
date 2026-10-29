@@ -366,6 +366,13 @@ Singleton {
   // ScrollEdge: rows past a list's edge, frosted under the bar over them.
   // Off, every list stops at its edge and nothing is captured or blurred.
   property bool scrollFrost: true
+  // Hyprland's blur variant (0.57), for windows, panels and menus alike:
+  // carried to hyprland by ThemeSync through lua/frost.lua
+  property string frostStyle: "kawase"
+  // the frost styles that keep the screen redrawing (Ripple and Water on
+  // the pointer, the rest on their own): LagWatch names one on a lag line
+  readonly property bool frostMoves: ["ripple", "water", "drops", "aurora", "heat_shimmer", "fluid_jar"]
+    .indexOf(root.frostStyle) >= 0
   property bool menuShadows: true
   // morpheus/Elastic's rubber band past a list's ends (user, 2026-10-14):
   // on by default; off, the wheel and the fingers stop dead at the edge
@@ -944,7 +951,9 @@ Singleton {
     { key: "surfacesSample", section: "surfaces", type: "sample", label: "Sample",
       alias: "preview sample surfaces panel menu card" },
     { key: "cornerRadius", section: "surfaces", label: "Corner rounding", type: "int",
-      min: 0, max: 16, step: 1, unit: "px",
+      // 24 since Hyprland 0.57 lifted its own window cap (20 → 100): past
+      // about 14 the short rows and buttons are already as round as they go
+      min: 0, max: 24, step: 1, unit: "px",
       alias: "corner radius rounding round rounded square button scrollbar thumb menu pill bar panel dialog card toast notification osd window hyprland",
       help: "Every rounded corner: hyprland's windows, and in the shell every button, row, card, dialog, menu, scroll thumb, the pill and its panels, toasts and the OSD. This is a window's corner; the rest keep their proportion to it, so a dialog stays rounder than a button. 0 is square everywhere; pills and circles stay round." },
     { key: "barMaxWidth", section: "surfaces", label: "Maximum panel width", type: "int",
@@ -975,6 +984,20 @@ Singleton {
     { key: "scrollFrost", section: "surfaces", alias: "scroll edge frost blur ghost rows under bar toolbar fade",
       label: "Frost under bars", type: "bool",
       help: "Rows scrolled past a list's edge carry on under the bar above it (or below it), blurred and fading out. Off, a list simply stops at its edge." },
+    { key: "frostStyle", section: "surfaces", label: "Frost style", type: "enum", open: true, chipW: 208,
+      alias: "blur frost glass acrylic haze prism ripple water drops aurora heat shimmer fluid jar style variant background behind window panel menu animated",
+      options: [ { value: "kawase",       label: "Plain" },
+                 { value: "frost",        label: "Frost" },
+                 { value: "acrylic",      label: "Acrylic" },
+                 { value: "haze",         label: "Haze" },
+                 { value: "prism",        label: "Prism" },
+                 { value: "ripple",       label: "Ripple (moves)" },
+                 { value: "water",        label: "Water (moves)" },
+                 { value: "drops",        label: "Drops (moves)" },
+                 { value: "aurora",       label: "Aurora (moves)" },
+                 { value: "heat_shimmer", label: "Heat shimmer (moves)" },
+                 { value: "fluid_jar",    label: "Fluid jar (moves)" } ],
+      help: "How what is behind a window, panel or menu is blurred. Plain is a soft even blur; Frost adds a fine glass grain; Acrylic a lens at the edges and a breath of the accent; Haze a pearly sheen; Prism splits light at the edges. The ones that move keep the screen redrawing — Ripple and Water answer the pointer, the rest move on their own — so they cost the graphics card all the time, and on a laptop the battery." },
     { key: "elasticScroll", section: "motion", alias: "elastic rubber band bounce overscroll scroll edge stretch",
       label: "Elastic scrolling", type: "bool",
       help: "Scrolling past the end of a list stretches it a little and springs back, as macOS does, and a fling bounces off the end. Off, every list stops dead at its edge." },
@@ -989,6 +1012,9 @@ Singleton {
     { key: "hyprAnimations", section: "motion", label: "Window animations", type: "bool",
       hyprFile: "effects", fx: "animations", hyprDefault: true, alias: "hyprland window workspace animation slide fade popin motion",
       help: "Hyprland's windows popping in and out, workspaces sliding, and the shell's layers fading as they open and close. Off, all of it is instant. Kept in ~/.config/zenworks/hypr/lua/effects.lua." },
+    { key: "hyprWobble", section: "motion", label: "Wobbly windows", type: "bool",
+      hyprFile: "effects", fx: "wobble", hyprDefault: false, alias: "hyprland wobble wobbly jelly window move drag spring",
+      help: "Windows bend and spring like jelly as they are dragged or resized. Off by default. Kept in ~/.config/zenworks/hypr/lua/effects.lua." },
     { key: "arrivalEnabled", section: "motion", label: "Play the arrival", type: "bool",
       help: "The pill's slide and the background's zoom, once, when the session starts." },
     { key: "arrivalDuration", section: "motion", label: "Arrival length", type: "int",
@@ -1397,6 +1423,8 @@ Singleton {
       help: "Resident size, against what a fresh start settles at — measured two minutes after each restart with nothing opened." },
     { key: "infoHealthStack", section: "health", label: "Qt and Hyprland", type: "info", health: "stack",
       help: "Qt, quickshell and Hyprland now, against what the last clean preflight ran on. After an update, run scripts/preflight.sh." },
+    { key: "infoHealthHypr", section: "health", label: "Hyprland config", type: "info", health: "hypr",
+      help: "Errors in the Lua config, and what Hyprland calls deprecated: it still works, and a later Hyprland drops it." },
     { key: "infoHealthTools", section: "health", label: "Tools", type: "info", health: "tools",
       fold: "tools",
       help: "The programs the shell calls out to, and the packages they come from. Click to unfold." },
@@ -2473,6 +2501,7 @@ Singleton {
   // EFFECTS. Each setting's spec names its field (`fx`).
   property bool hyprShadows: true
   property bool hyprAnimations: true
+  property bool hyprWobble: false
   property int hyprGapsOut: 8
   property int hyprGapsIn: 2
   property int hyprSpecialGaps: 30

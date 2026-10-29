@@ -737,7 +737,12 @@ function base64Of(buf) {
 // what goes into the notes for a file chosen to show: a picture as
 // Markdown, a video as its bare address (GitHub's own way), on its own line
 function mediaMarkdown(path) {
-  var url = "file://" + encodeURI(String(path));
+  // ( ) ' as well: left as they are, the link ended at the first ")" and
+  // the upload's address reader stopped there too, so "Screenshot (2).png"
+  // was never sent (audit 2026-10-28d)
+  var url = "file://" + encodeURI(String(path)).replace(/[()']/g, function (c) {
+    return "%" + c.charCodeAt(0).toString(16).toUpperCase();
+  });
   var name = baseName(path).replace(/\.[^.]*$/, "").replace(/[\[\]]/g, "");
   return VIDEO_EXT.test(path) ? url : "![" + name + "](" + url + ")";
 }

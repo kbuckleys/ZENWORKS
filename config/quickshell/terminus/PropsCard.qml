@@ -199,6 +199,7 @@ Item {
     const r = props.rows[0];
     if (!r || r.isDir || sumProc.running) return;
     props.checksum = "\u2026";
+    sumProc.forGen = props.gen;
     sumProc.command = ["sh", "-c", Terminus.checksumCommand(r.path)];
     sumProc.running = true;
   }
@@ -664,6 +665,7 @@ Item {
             spacing: 12
 
             Text {
+              textFormat: Text.PlainText
               width: 118
               height: parent.height
               horizontalAlignment: Text.AlignRight
@@ -707,6 +709,7 @@ Item {
             }
 
             Text {
+              textFormat: Text.PlainText
               id: propValue
               width: propFacts.width - 118 - 48
               height: parent.height
@@ -897,6 +900,7 @@ Item {
             }
 
             Text {
+              textFormat: Text.PlainText
               anchors.centerIn: parent
               text: modelData[0]
               color: parent.on ? Zenon.cyan : Zenon.accentMuted
@@ -965,6 +969,7 @@ Item {
           height: 34
 
           Text {
+            textFormat: Text.PlainText
             width: permGrid.labelW
             height: parent.height
             verticalAlignment: Text.AlignVCenter
@@ -1007,6 +1012,7 @@ Item {
                 }
 
                 Text {
+                  textFormat: Text.PlainText
                   anchors.centerIn: parent
                   // a box the selection disagrees on: neither, until clicked
                   text: bitCell.mixed ? "?" : modelData[0]
@@ -1240,10 +1246,14 @@ Item {
 
   Process {
     id: sumProc
+    // the card it was asked for: a hash still running when the card moved
+    // on to another file landed there as that file's (audit 2026-10-28d)
+    property int forGen: -1
     stdout: StdioCollector {
       id: sumOut
       waitForEnd: true
       onStreamFinished: {
+        if (sumProc.forGen !== props.gen) return;
         const t = String(sumOut.text || "").trim();
         props.checksum = t === "" ? "unreadable" : t;
       }

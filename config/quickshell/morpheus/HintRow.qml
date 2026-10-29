@@ -75,6 +75,7 @@ Row {
       }
 
       Text {
+        textFormat: Text.PlainText
         anchors.verticalCenter: parent.verticalCenter
         // sentence case, as every word a person reads (Strings.sentence)
         text: Strings.sentence(pair.modelData[1])
@@ -130,6 +131,7 @@ Row {
               label: parent.modelData[0]
             }
             Text {
+              textFormat: Text.PlainText
               anchors.verticalCenter: parent.verticalCenter
               text: Strings.sentence(parent.modelData[1])
               color: Zenon.accentKey

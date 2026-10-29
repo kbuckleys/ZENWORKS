@@ -296,7 +296,10 @@ def plan(full, files, branch=None):
         if partial and not exists and len(files) <= 30:
             # a tree too big to list whole: asked one path at a time
             try:
-                call("GET", f"/repos/{full}/contents/{path}?ref={branch if not fresh else default}", tok=tok)
+                # quoted: a space was http.client's InvalidURL, which is no
+                # ForgeError, and the whole plan failed (audit 2026-10-28d)
+                ref = urllib.parse.quote(branch if not fresh else default, safe="")
+                call("GET", f"/repos/{full}/contents/{urllib.parse.quote(path, safe='/')}?ref={ref}", tok=tok)
                 exists = True
             except ForgeError:
                 pass
@@ -334,7 +337,7 @@ def upload(full, files, message, branch=None, emit=None, cancel=None):
             first["data"] = fh.read()
         if emit:
             emit({"file": first["path"], "state": "sending"})
-        r = call("PUT", f"/repos/{full}/contents/{first['path']}", {
+        r = call("PUT", f"/repos/{full}/contents/{urllib.parse.quote(first['path'].lstrip('/'), safe='/')}", {
             "message": message, "branch": branch,
             "content": base64.b64encode(first["data"]).decode()}, tok=tok)
         if emit:

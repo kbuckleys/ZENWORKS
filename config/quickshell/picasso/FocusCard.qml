@@ -199,6 +199,7 @@ Item {
     const ad = card.picker.focusAdopt;
     if (ad && ad.tmp === card.path) {
       card.busyText = "Writing it\u2026";
+      adoptProc.forTmp = ad.tmp;
       adoptProc.command = Terminus.shArgv(Terminus.convertIntoCommand(ad.tmp, ad.dir, ad.name));
       adoptProc.running = true;
       return;
@@ -207,9 +208,17 @@ Item {
   }
   Process {
     id: adoptProc
+    property string forTmp: ""
     stdout: StdioCollector { id: adoptOut; waitForEnd: true }
     onExited: (code) => {
       const made = String(adoptOut.text || "").trim();
+      // the card closed (cancelled) while it was writing: not applied, and
+      // the copy it wrote goes too — it was set anyway (audit 2026-10-28d)
+      if (!card.picker.focusOpen || card.path !== adoptProc.forTmp) {
+        if (code === 0 && made !== "") Quickshell.execDetached(["rm", "-f", "--", made]);
+        card.busyText = "";
+        return;
+      }
       // the card's close throws the scratch file away (dropAdopt)
       if (code === 0 && made !== "") card.applyPath(made);
       else card.busyText = "";

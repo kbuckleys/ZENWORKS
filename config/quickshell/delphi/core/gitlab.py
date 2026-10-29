@@ -508,7 +508,9 @@ def job_log(full, job):
     tok, _ = token()
     h = {"User-Agent": "delphi"}
     if tok:
-        h["PRIVATE-TOKEN"] = tok
+        # Bearer, as call() sends it: glab's OAuth token is refused as
+        # PRIVATE-TOKEN (audit 2026-10-28d: job logs were a 401)
+        h["Authorization"] = "Bearer " + tok
     t = rest.text(f"{API}/projects/{_pid(full)}/jobs/{int(job)}/trace", h, who=NAME)
     return {"lines": rest.log_lines(t)}
 

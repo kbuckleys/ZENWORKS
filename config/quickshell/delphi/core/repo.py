@@ -1208,6 +1208,11 @@ class Repo:
         # follows lists the conflicts.
         code, out, err = self.git.stream(args, _progress(emit), cancel, **envkw)
         st = S.repo_state(self.gitdir)
+        # a bisect under way is not this operation stopping: it made every
+        # merge "not done" and every failure "Stopped on conflicts" (audit
+        # 2026-10-28d)
+        if st is not None and st.get("op") == "bisect":
+            st = None
         if code == 0:
             return {"done": st is None, "state": st}
         if st is not None or "CONFLICT" in out + err:
@@ -1298,7 +1303,10 @@ class Repo:
             raw = f.read()
         if hashlib.sha1(raw).hexdigest() != token:
             raise GitError(["merge"], 1, f"{path} changed since it was shown — look again before choosing")
-        blocks = _blocks(raw.decode("utf-8", errors="replace"))
+        # the file's own bytes kept, whatever its encoding: "replace" made
+        # every Latin-1 byte U+FFFD, in the parts not chosen too (audit
+        # 2026-10-28d). The view's copy (conflict_blocks) may stay replaced.
+        blocks = _blocks(raw.decode("utf-8", errors="surrogateescape"))
         out, left, i = [], 0, 0
         for b in blocks:
             if "same" in b:
@@ -1319,7 +1327,7 @@ class Repo:
             else:
                 out += b["raw"]
                 left += 1
-        with open(full, "w", encoding="utf-8", newline="") as f:
+        with open(full, "w", encoding="utf-8", errors="surrogateescape", newline="") as f:
             f.write("".join(out))
         if left == 0 and mark:
             self.git.run(["add", "--", lit1(path)], cancel=cancel)

@@ -5,9 +5,9 @@
 //
 // The track name, and nothing else — the artist, the album and the controls
 // all live one hover away in the panel. It also carries the state that a
-// separate play/pause glyph used to, by inverting itself: playing is green
-// filled with black text, paused is the plain green-on-nothing every other
-// module wears. Swapping figure and ground reads from much further away than
+// separate play/pause glyph used to, by inverting itself: playing is the
+// accent filled with black text, paused is the plain accent-on-nothing every
+// other module wears. Swapping figure and ground reads from much further away than
 // a halo did.
 
 import QtQuick
@@ -26,7 +26,7 @@ Collapsible {
     leftPadding: Zenon.padModule
     rightPadding: Zenon.padModule
 
-    // Only the text lives here. The green behind it is drawn by the PILL, in
+    // Only the text lives here. The accent wash behind it is drawn by the PILL, in
     // shell.qml: a takeover has to run to the pill's edge and round off with
     // its corner, and nothing inside the layout can reach past its own margin
     // to do that.
@@ -48,11 +48,12 @@ Collapsible {
         // the spare row above instead.
         anchors.verticalCenterOffset: 1
         text: NowPlaying.title
-        // Green either way now: against a half-strength fill there is enough
-        // dark showing through that the text can stay the accent color, and
-        // the state is carried by the wash appearing rather than by the words
-        // inverting.
-        color: Zenon.green
+        // The accent either way now: against a half-strength fill there is
+        // enough dark showing through that the text can stay the accent color,
+        // and the state is carried by the wash appearing rather than by the
+        // words inverting. Zenon.cyan is the accent (theme, Accent color or
+        // Follow Background), as the clock and counts wear it.
+        color: Zenon.cyan
         // A title is arbitrarily long and the pill is only 1000px wide. Capped
         // and elided here rather than letting one song push every other module
         // off the end of the bar.

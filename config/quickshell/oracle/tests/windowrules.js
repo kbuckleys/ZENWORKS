@@ -59,6 +59,9 @@ module.exports = {
     t.eq("remembered size floating", O.windowRuleWords(Object.assign(O.blankWindowRule("a"), { float: true, persistent_size: true })), "Floats · remembers its size");
     t.eq("persistent_size round-trips", O.parseWindowsLua(O.renderWindowsLua([Object.assign(O.blankWindowRule("a"), { float: true, persistent_size: true })]))[0].persistent_size, true);
     t.eq("an old rule without it reads false", O.normWindowRule({ class: "a" }).persistent_size, false);
+    t.eq("a border hue reads in words", O.windowRuleWords(Object.assign(O.blankWindowRule("a"), { border: "blue" })), "Blue border");
+    t.eq("red is not a border (the urgent flash)", O.normWindowRule({ class: "a", border: "red" }).border, "");
+    t.eq("a border round trips", O.parseWindowsLua(O.renderWindowsLua([Object.assign(O.blankWindowRule("a"), { border: "green" })]))[0].border, "green");
     t.eq("a shell keyword is not looked for", O.startupLook("sh -c 'for i in 1 2; do foo; done'"), "");
     t.eq("startup name", O.startupName("discord --start-minimized"), "Discord");
 

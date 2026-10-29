@@ -743,6 +743,13 @@ Rectangle {
               // what stops the seed and the write-back chasing each
               // other.
               Component.onCompleted: valueField.text = ruleRow.value
+              // except when the kind changes: setRule empties the value,
+              // and the field went on showing the old words over an empty
+              // rule (audit 2026-10-28d)
+              Connections {
+                target: ruleRow
+                function onKindChanged() { if (valueField.text !== ruleRow.value) valueField.text = ruleRow.value; }
+              }
             }
 
             Text {

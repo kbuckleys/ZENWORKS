@@ -263,10 +263,22 @@ Item {
   }
   Process {
     id: appsProc
+    // a directory asked for while a file's scan was out: that answer is
+    // not the directory's, and it stuck on the directory's menu (audit
+    // 2026-10-28d)
+    property bool drop: false
     stdout: StdioCollector {
       id: appsOut
       waitForEnd: true
       onStreamFinished: {
+        if (appsProc.drop) {
+          appsProc.drop = false;
+          if (term.appsAgain === "") return;
+          const q = term.appsAgain;
+          term.appsAgain = "";
+          term.findApps(q);
+          return;
+        }
         term.openWithApps = Terminus.parseApps(appsOut.text);
         term.openWithMime = Terminus.parseAppsMime(appsOut.text);
         term.openWithDefault = Terminus.parseAppsDefault(appsOut.text);
@@ -294,7 +306,8 @@ Item {
     term.appsScanned = false;
     // A directory: nothing further is coming, so the answer is in — there is
     // nothing to open this with.
-    if (!path) { term.appsScanned = true; return; }
+    if (!path) { appsProc.drop = appsProc.running; term.appsAgain = ""; term.appsScanned = true; return; }
+    appsProc.drop = false;
     appsProc.command = ["sh", "-c", Terminus.appsCommand(path)];
     appsProc.running = true;
   }

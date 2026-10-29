@@ -43,6 +43,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
 import "lagnotes.js" as LagNotes
+import "../oracle"
 
 Item {
   id: lag
@@ -239,6 +240,9 @@ Item {
       if (lag.focusedIn !== "") parts.push("in " + lag.focusedIn.slice(0, 40));
       if (all.length) parts.push("after " + all.join(", "));
     }
+    // a frost style that moves redraws the whole screen all the time, so a
+    // line with lag in it says which one was on
+    if ((lag.stalls || lag.gaps) && Oracle.frostMoves) parts.push("frost " + Oracle.frostStyle + " (moves)");
     const reports = typeof LagNotes.takeLines === "function" ? LagNotes.takeLines() : [];
     if (reports.length) parts.push(reports.join(" · "));
     lag.stalls = 0; lag.stallMax = 0; lag.gaps = 0; lag.gapMax = 0;

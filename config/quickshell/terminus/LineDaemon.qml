@@ -70,6 +70,9 @@ Scope {
       // every request still out fails now, not never
       const p = line._pending;
       line._pending = ({});
+      // and what waited for "ready" goes with them: sent at the next start,
+      // an op its caller was told had failed ran anyway (audit 2026-10-28d)
+      line._out = [];
       for (const k in p) {
         try { if (p[k].done) p[k].done(false, null, { kind: "gone", error: line.goneText }); } catch (e) {}
       }

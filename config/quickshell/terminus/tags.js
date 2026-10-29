@@ -86,7 +86,7 @@ var DEFAULT_VIEW = "list";
 // a link and tagging its target are two different acts, and following here
 // would report the target's tags against the link's path.
 function scanTagsCommand(root) {
-  return "getfattr -Rh --absolute-names -n " + ATTR
+  return "getfattr -Rh -e text --absolute-names -n " + ATTR
     + " -- " + Strings.shellQuote(root) + " 2>/dev/null || true";
 }
 
@@ -94,7 +94,7 @@ function scanTagsCommand(root) {
 // whole tree. The same dump as scanTagsCommand, for parseTagDump; as argv,
 // so a directory of thousands is arguments and not one enormous script.
 function readTagsArgv(paths) {
-  return ["sh", "-c", "getfattr -h --absolute-names -n " + ATTR + " -- \"$@\" 2>/dev/null || true",
+  return ["sh", "-c", "getfattr -h -e text --absolute-names -n " + ATTR + " -- \"$@\" 2>/dev/null || true",
           "tags"].concat(paths || []);
 }
 

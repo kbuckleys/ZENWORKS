@@ -96,6 +96,10 @@ Item {
         term.pruneTagIndex(statProc.askedFor, rows);
         // overtaken: the page it was for is no longer the one being opened
         if (statProc.next) return;
+        // left: the page was closed (Escape, a directory entered) before
+        // its rows came, and they would land in the directory listing and
+        // stay there (audit 2026-10-28d)
+        if (term.searchMode === "" && term.pendingRealm === null) return;
         // Everything the new realm is, in one frame with its rows.
         term.applyPendingRealm();
         term.act.raw = rows;

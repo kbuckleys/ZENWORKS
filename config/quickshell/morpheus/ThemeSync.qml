@@ -76,7 +76,7 @@ Item {
   readonly property var hyprColors: {
     const out = { name: Zenon.theme.name || Zenon.themeName };
     for (const s of ["surface", "ink", "red", "blue", "magenta", "cyan", "pink", "sand",
-                     "border", "onAccent"])
+                     "green", "yellow", "border", "onAccent"])
       out[s] = Zenon.hex(Zenon[s]);
     return out;
   }
@@ -142,6 +142,9 @@ Item {
   readonly property int windowCorner: Zenon.windowRadius
   readonly property string cornerText: Sync.renderCornerLua(sync.windowCorner)
   onWindowCornerChanged: settle.restart()
+  // and its Frost style: lua/frost.lua (themesync.js)
+  readonly property string frostText: Sync.renderFrostLua(Oracle.frostStyle, Zenon.cyan, Zenon.magenta)
+  onFrostTextChanged: settle.restart()
 
   onKittyTextChanged: settle.restart()
   onGtk4TextChanged: settle.restart()
@@ -163,6 +166,7 @@ Item {
       if (sync.put(hyprFile, sync.hyprText)) tell.hypr = true;
       if (sync.put(fontFile, sync.fontText, true)) tell.hypr = true;
       if (sync.put(cornerFile, sync.cornerText, true)) tell.hypr = true;
+      if (sync.put(frostFile, sync.frostText, true)) tell.hypr = true;
       // nothing to tell GTK 4: an app reads its gtk.css as it starts
       sync.put(gtk4File, sync.gtk4Text);
       // GTK 3 rereads colors.css when gtkscheme.sh names a fresh theme slot,
@@ -214,6 +218,16 @@ Item {
     property bool exists: true
     property string last: ""
     path: sync.hyprLuaDir + "/corner.lua"
+    blockLoading: true
+    printErrors: false
+    onLoadFailed: exists = false
+  }
+
+  FileView {
+    id: frostFile
+    property bool exists: true
+    property string last: ""
+    path: sync.hyprLuaDir + "/frost.lua"
     blockLoading: true
     printErrors: false
     onLoadFailed: exists = false

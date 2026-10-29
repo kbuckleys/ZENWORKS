@@ -20,7 +20,6 @@
 //   the well ctrl return send · esc back
 
 import QtQuick
-import Quickshell
 import "../morpheus"
 import "../terminus"
 import "delphi.js" as D
@@ -175,7 +174,7 @@ Item {
   }
 
   // ── doing things ───────────────────────────────────────────────────────
-  function web() { if (pg.item) Quickshell.execDetached(["xdg-open", pg.item.url]); }
+  function web() { if (pg.item) Strings.openLink(pg.item.url); }
 
   function send() {
     const t = pg.item, body = reply.text.trim();

@@ -25,6 +25,7 @@ Column {
       width: bl.width
       spacing: 5
       Text {
+        textFormat: Text.PlainText
         visible: blk.modelData.p !== undefined
         width: parent.width
         wrapMode: Text.Wrap
@@ -52,6 +53,7 @@ Column {
             font.pixelSize: Zenon.px(16)
           }
           Text {
+            textFormat: Text.PlainText
             width: parent.width - 28
             wrapMode: Text.Wrap
             text: modelData

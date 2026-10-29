@@ -390,12 +390,15 @@ function overrideFlag(row, on) {
   return on ? verb[0] + (row.kind === "filesystems" ? row.raw : row.value) : verb[1] + row.value;
 }
 // the steps that set it — yours as you, the system's as root
+// (the user's is a shell line: the flag carries a path from the app's own
+// metadata, quoted so a space or a ; in it is the path's — audit 2026-10-28d)
+function shq(s) { return "'" + String(s).replace(/'/g, "'\\''") + "'"; }
 function overrideSteps(id, scope, flag) {
-  if (scope === "user") return [["@user", "flatpak override --user " + flag + " " + id]];
+  if (scope === "user") return [["@user", "flatpak override --user " + shq(flag) + " " + shq(id)]];
   return [["@sudo", "flatpak", "override", "--system", flag, id]];
 }
 function overrideResetSteps(id, scope) {
-  if (scope === "user") return [["@user", "flatpak override --user --reset " + id]];
+  if (scope === "user") return [["@user", "flatpak override --user --reset " + shq(id)]];
   return [["@sudo", "flatpak", "override", "--system", "--reset", id]];
 }
 

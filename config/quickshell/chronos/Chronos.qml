@@ -163,7 +163,9 @@ Singleton {
       ? Kairos.summarySince(Date.now() - t.minutes * 60000) : "";
     Quickshell.execDetached([
       "notify-send", "-u", "critical", "-a", "chronos",
-      t.label, t.minutes + " minute timer finished" + (went !== "" ? "\n" + went : "")
+      // "--": a label or a title opening with "-" read as an option, and
+      // notify-send refused it (no toast at all)
+      "--", t.label, t.minutes + " minute timer finished" + (went !== "" ? "\n" + went : "")
     ]);
   }
 
@@ -386,7 +388,7 @@ Singleton {
                  "-h", "string:x-howler-event:" + (Chr.isColor(hue) ? hue : "cyan"),
                  "-h", "string:x-howler-day:" + e.date,
                  "-A", "snooze=Snooze 10 min", "-A", "done=Done",
-                 e.title, Chr.remindWords(e, Date.now())];
+                 "--", e.title, Chr.remindWords(e, Date.now())];
     p.running = true;
   }
   Component {

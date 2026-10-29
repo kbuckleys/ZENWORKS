@@ -80,6 +80,10 @@ if okInput and type(input) == "table" then
 	end
 	pcall(hl.config, { input = cfg })
 end
+-- the click that focuses a window only focuses it, the way macOS does: it
+-- is not also a press on whatever is under the pointer (0.57). Not a
+-- setting: the old click-through is gone on purpose.
+hl.config({ input = { swallow_focus_click = true } })
 
 -- CURSOR
 hl.env("HYPRCURSOR_THEME", "XCursor-Pro-Hyprcursor-Dark")
@@ -138,6 +142,21 @@ end
 local okCorner, cornerFile = pcall(require, "lua.corner")
 local corner = okCorner and type(cornerFile) == "table" and tonumber(cornerFile.rounding) or 5
 
+-- FROST: oracle's Frost style, Hyprland 0.57's blur variant, and acrylic's
+-- tint (the accent), written to frost.lua by ThemeSync; plain kawase with
+-- no file yet. The moving ones (ripple … fluid_jar) are oracle's to offer
+-- with a warning; anything Hyprland does not have stays kawase.
+local okFrost, frostFile = pcall(require, "lua.frost")
+local frost = { variant = "kawase" }
+if okFrost and type(frostFile) == "table" then
+	local known = { kawase = true, frost = true, acrylic = true, haze = true, prism = true, ripple = true,
+		water = true, drops = true, aurora = true, heat_shimmer = true, fluid_jar = true }
+	if known[frostFile.variant] then frost.variant = frostFile.variant end
+	for _, k in ipairs({ "tint", "aurora1", "aurora2", "fluid" }) do
+		if type(frostFile[k]) == "string" then frost[k] = frostFile[k] end
+	end
+end
+
 hl.config({
 	render = {
 		expand_undersized_textures = false,
@@ -155,6 +174,8 @@ hl.config({
 		disable_splash_rendering = true,
 		initial_workspace_tracking = 0,
 		close_special_on_empty = true,
+		-- a terminal's BEL: howler plays it (and keeps quiet when toasts do)
+		bell_sound = "none",
 		disable_hyprland_logo = true,
 		-- XDG_CURRENT_DESKTOP is ZENWORKS:Hyprland on purpose (bin/zen,
 		-- and above): without this Hyprland greets every login with "set
@@ -205,6 +226,11 @@ hl.config({
             special = true,
             popups = true,
             popups_ignorealpha = 0.5,
+            -- oracle's Frost style (lua/frost.lua, above)
+            variant = frost.variant,
+            acrylic = frost.tint and { tint = frost.tint } or nil,
+            aurora = frost.aurora1 and { color1 = frost.aurora1, color2 = frost.aurora2 } or nil,
+            fluid_jar = frost.fluid and { color = frost.fluid } or nil,
 		},
 		shadow = {
             range = 70,
@@ -246,6 +272,10 @@ hl.config({
 	binds = {
 		hide_special_on_workspace_change = true,
 		scroll_event_delay = 0,
+		-- a tiled window dragged loose floats centered under the pointer,
+		-- not left hanging off it at its tiled offset (0.57's default, kept
+		-- on purpose and written down so a later default cannot move it)
+		drag_center_window = true,
 	},
 })
 
@@ -271,7 +301,11 @@ end
 local okFx, fx = pcall(require, "lua.effects")
 if okFx and type(fx) == "table" then
 	pcall(hl.config, {
-		decoration = { shadow = { enabled = fx.shadows ~= false } },
+		decoration = {
+			shadow = { enabled = fx.shadows ~= false },
+			-- Motion's Wobbly windows: off unless the file says true
+			wobble = { enabled = fx.wobble == true },
+		},
 		animations = { enabled = fx.animations ~= false },
 	})
 	local function num(v) return type(v) == "number" and v or nil end
@@ -340,6 +374,13 @@ if okTheme and type(theme) == "table" and next(theme) ~= nil then
 	stateBorder({ float = true }, t.float_border)
 	stateBorder({ fullscreen_state_internal = 1 }, t.zoom_border)
 	stateBorder({ pin = true }, t.pin_border)
+	-- a window rule's Border (rules.lua queues them in ZENWORKS.ruleBorders):
+	-- the theme's rule_<hue> pair, after the states so the one chosen wins
+	for _, b in ipairs(ZENWORKS.ruleBorders or {}) do
+		local match = { group = false }
+		for k, v in pairs(b.match) do match[k] = v end
+		pcall(stateBorder, match, t["rule_" .. b.hue])
+	end
 end
 
 -- FONT: oracle's Font, weight and size, written to font.lua by quickshell's

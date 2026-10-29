@@ -583,8 +583,11 @@ LayerPopup {
   // card leaves you where you ended up.
   function stepFocus(delta) {
     const list = popup.focusList;
-    if (list.length === 0) return;
-    const from = popup.focusIndex < 0 ? 0 : popup.focusIndex;
+    // a picture from outside the list (the viewer's Set as background, a
+    // scratch selection) has no neighbors: a step landed on list[1], an
+    // unrelated background (audit 2026-10-28d; the arrows already hide)
+    if (list.length === 0 || popup.focusIndex < 0) return;
+    const from = popup.focusIndex;
     const to = Math.max(0, Math.min(from + delta, list.length - 1));
     if (to === popup.focusIndex) return;
     popup.focusPath = list[to].path;

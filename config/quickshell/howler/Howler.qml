@@ -450,7 +450,9 @@ Singleton {
     // A CAPTURE SAYS SO IN ITS HINTS — what kind (`shot` or `video`), which
     // file, and for a recording which picture of it — and is drawn as its picture with buttons of its own. The
     // server drops every hint it was not asked to keep, so these are named.
-    extraHints: ["x-howler-capture", "x-howler-file", "x-howler-picture"]
+    // Chronos' reminders name their hue and day the same way (dropped
+    // until audit 2026-10-28d: the reminder look never showed)
+    extraHints: ["x-howler-capture", "x-howler-file", "x-howler-picture", "x-howler-event", "x-howler-day"]
 
     onNotification: (notif) => {
       // TRACKED FIRST. An untracked notification is closed the moment this
@@ -586,6 +588,24 @@ Singleton {
   })
   readonly property bool quiet: root.focusState.quiet
   readonly property string quietWhy: root.focusState.why
+
+  // ── the system bell (Hyprland 0.57) ─────────────────────────────────────
+  // A terminal's BEL (xdg-system-bell) — not this bell, the panel. Hyprland
+  // 0.57 began playing it itself; base.lua sets misc.bell_sound = "none" and
+  // the sound is played here instead, so it keeps quiet whenever toasts do.
+  // The same canberra theme sound Hyprland would have played. A program that
+  // rings in a loop is heard at most four times a second.
+  property real lastRing: 0
+  Connections {
+    target: Hyprland
+    function onRawEvent(ev) {
+      if (ev.name !== "bell" || root.quiet) return;
+      const now = Date.now();
+      if (now - root.lastRing < 250) return;
+      root.lastRing = now;
+      Quickshell.execDetached(["canberra-gtk-play", "-i", "bell", "-d", "Zenworks bell"]);
+    }
+  }
   function toggleFocusTimers() { Oracle.set("notifFocusTimers", !Oracle.notifFocusTimers); }
   function toggleQuietHours() { Oracle.set("notifQuietHours", !Oracle.notifQuietHours); }
   // Ids held back this session, so the stack can draw them as nothing for the

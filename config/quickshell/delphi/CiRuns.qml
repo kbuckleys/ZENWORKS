@@ -10,7 +10,6 @@
 // chip's bubble.
 
 import QtQuick
-import Quickshell
 import "../morpheus"
 
 Column {
@@ -48,7 +47,7 @@ Column {
           enabled: !!one.modelData.url || (!!one.modelData.job && !!cr.win)
           cursorShape: Qt.PointingHandCursor
           onClicked: if (one.modelData.job && cr.win) cr.win.jobLog(one.modelData);
-                     else Quickshell.execDetached(["xdg-open", one.modelData.url])
+                     else Strings.openLink(one.modelData.url)
         }
       }
     }
