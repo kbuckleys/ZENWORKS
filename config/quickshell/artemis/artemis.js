@@ -92,9 +92,27 @@ function source_(indexPath, dirsOnly, scope) {
 
 // The per-keystroke half, and all it does now is rank. ~7ms against the
 // cached index, versus ~400ms for the traversal it replaces.
+//
+// ── SMART, IN THREE TRIES (user, 2026-10-29: "they both need to be smart",
+// with Terminus' search) ──
+// Fuzzy over the whole path lit everything under ~/.config for "config" and
+// anything with an i, n and v in order for "inv". Now, case never matters
+// (`-i`), and the first try that finds anything wins:
+//   1. the words as typed (`-e`) in the NAME, ranked by fzf
+//   2. the words as typed anywhere in the PATH — "zen config", "share/icons"
+//   3. fuzzy in the name, so a typo still finds something
+// The name rides in front of the line on a tab (awk), fzf picks the field,
+// and cut hands back the path as it was.
 function filterCommand(indexPath, query, dirsOnly, scope) {
-  return source_(indexPath, dirsOnly, scope) + " | fzf --filter " +
-    Strings.shellQuote(String(query).trim()) + " 2>/dev/null | head -n 500";
+  const src = source_(indexPath, dirsOnly, scope)
+    + " | awk '{ n = $0; sub(/\\/$/, \"\", n); sub(/.*\\//, \"\", n); print n \"\\t\" $0 }'";
+  const q = Strings.shellQuote(String(query).trim());
+  const by = (how, nth) => src + " | fzf --filter " + q + " -i " + how
+    + " -d '\\t' --nth " + nth + " 2>/dev/null | cut -f2- | head -n 500";
+  return "r=$(" + by("-e", "1") + "); "
+    + "[ -n \"$r\" ] || r=$(" + by("-e", "2") + "); "
+    + "[ -n \"$r\" ] || r=$(" + by("", "1") + "); "
+    + "[ -z \"$r\" ] || printf '%s\\n' \"$r\"";
 }
 
 // The listing shown before anything is typed, restricted to directories when

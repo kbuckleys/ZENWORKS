@@ -30,6 +30,7 @@
 .pragma library
 .import qs.morpheus as Morpheus
 .import "../morpheus/hypr.js" as Hypr
+.import "../artemis/artemis.js" as Artemis
 // ONE COPY FOR THE WHOLE SHELL. Without the pragma every component instance
 // that imports this file — every row, tile, card and sheet — evaluated all of
 // it again; a profile caught terminus.js and icons.js costing hundreds of ms
@@ -1911,13 +1912,27 @@ function findCommand(dir, query) {
   // directory with a slash — so its last field is the empty string, and every
   // directory scored zero and vanished from the results entirely. The caller
   // strips the trailing slash again when it parses.
-  const rank = (nth) => " | fzf --filter " + q + " -d / --nth " + nth
+  //
+  // ── WORDS, NOT SCATTERED LETTERS (user, 2026-10-29: "need search to be
+  // smarter, and case insensitive. i get too many results") ──
+  // Fuzzy matched "inv" to anything with an i, an n and a v in that order,
+  // so a short query lit half the tree. Each word typed is now a piece of the
+  // name (`-e`), in any case (`-i`), still ranked by fzf, so prefixes and word
+  // starts come first. Fuzzy is the fallback, run only when nothing has the
+  // words as typed, so a typo still finds something.
+  //
+  // THE TREE WITHOUT ITS STORES: Artemis' excludes (.git, node_modules,
+  // caches, Electron's Cache_Data and the rest), which held most of the hits
+  // nobody meant. Patterns are relative to the root, so a search started
+  // inside one of them still searches it.
+  const walk = (t) => "fd -t " + t + " -H --no-ignore " + Artemis.excludes()
+    + " --color=never . " + d + " 2>/dev/null";
+  const rank = (nth, how) => " | fzf --filter " + q + " -i " + how + " -d / --nth " + nth
     + " 2>/dev/null";
-  return "{ fd -t d -H --no-ignore --color=never . " + d + " 2>/dev/null"
-    + rank(-2)
-    + " ; fd -t f -H --no-ignore --color=never . " + d + " 2>/dev/null"
-    + rank(-1)
-    + " ; } | head -n 500 | tr '\\n' '\\0'";
+  const pass = (how) => "{ " + walk("d") + rank(-2, how) + " ; " + walk("f") + rank(-1, how) + " ; }";
+  return "r=$(" + pass("-e") + " | head -n 300); "
+    + "if [ -n \"$r\" ]; then printf '%s\\n' \"$r\"; else " + pass("") + " | head -n 300; fi"
+    + " | tr '\\n' '\\0'";
 }
 
 // DIRECTORIES ONLY, for the send-to sheet's filter, and the WHOLE MACHINE.
