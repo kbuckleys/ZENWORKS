@@ -1471,6 +1471,26 @@ def aur_recipe_read_not_run():
 
 
 @test
+def aur_packager_stamped():
+    import aur
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "PKGBUILD")
+        with open(path, "w") as f:
+            f.write("pkgname=foo\npkgver=1.2\npkgrel=3\narch=(any)\n")
+        aur.stamp(d)
+        eq(open(path).read(), 'pkgname=foo\npkgver=1.2\npkgrel=3\nPACKAGER="Zenworks Delphi"\narch=(any)\n')
+        # in step stays in step: a second stamp writes nothing
+        os.utime(path, (1, 1))
+        aur.stamp(d)
+        eq(os.path.getmtime(path), 1)
+        with open(path, "w") as f:
+            f.write("pkgname=foo\npkgrel=1\nPACKAGER='Someone <a@b>'\n")
+        aur.stamp(d)
+        eq(open(path).read().count("PACKAGER="), 1)
+        eq('PACKAGER="Zenworks Delphi"' in open(path).read(), True)
+
+
+@test
 def ssh_hosts_checked():
     import sshkeys as K
     # a remote's host is never an ssh option, nor config lines of its own
@@ -1759,6 +1779,7 @@ def aur_new_package_written():
     eq("pkgdesc='it'\\''s quick'" in t, True)
     g = N.write(dict(spec, kind="git", source="https://gitlab.com/me/zap"))
     eq([("pkgname=zap-git" in g), ("provides=('zap')" in g), ("'git'" in g), ("git+https://gitlab.com/me/zap" in g)], [True] * 4)
+    eq(['PACKAGER="Zenworks Delphi"' in t, 'PACKAGER="Zenworks Delphi"' in g], [True, True], "made with Delphi")
     # a manifest's address or a tag is shell in a double-quoted source=
     # (audit 2026-10-28): refused, never written
     for bad in (dict(spec, name="Zap!"), dict(spec, source="file:///etc"), dict(spec, version="1 2"),

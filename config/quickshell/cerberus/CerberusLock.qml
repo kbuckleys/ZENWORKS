@@ -1639,9 +1639,5 @@ Scope {
     onTriggered: uptimeProc.running = true
   }
 
-  SystemClock {
-    id: clock
-    precision: SystemClock.Minutes
-    enabled: true
-  }
+  WallClock { id: clock }
 }

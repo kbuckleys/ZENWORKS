@@ -24,6 +24,8 @@ module.exports = {
       "decoration:shadow:offset": "0 10", "zen:gesture:3:up": "special", "zen:ws:2:monitor": "DP-1" });
     t.eq("round trip, four places kept", O.parseHyprLua(O.renderHyprLua(some)), some);
     t.eq("a hand-written key is kept", O.parseHyprLua(O.renderHyprLua({ "debug:overlay": true }))["debug:overlay"], true);
+    t.eq("a retired key is not kept as hand-written",
+      O.renderHyprLua(O.parseHyprLua('return { ["dwindle:special_scale_factor"] = 1 }')).indexOf("special_scale_factor"), -1);
     t.eq("a comment is not a choice", O.parseHyprLua('-- ["misc:vrr"] = 1\nreturn {}')["misc:vrr"], undefined);
     t.eq("a row is hl:<name>, its choices filled in",
       [O.hyprSpec(fields.find((f) => f.key === "zen:gesture:3:up"), []).key, O.hyprSpec(fields.find((f) => f.key === "zen:gesture:3:up"), []).options.length,

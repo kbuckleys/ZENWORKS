@@ -333,6 +333,9 @@ end
 -- costs that one. "" leaves a setting to hyprland; "0 10" is a pair.
 -- zen:gesture:<fingers>:<direction> = "<action>" is a touchpad gesture, and
 -- zen:ws:<n>:monitor / :layout a workspace's rule. Guarded like defaults.lua.
+-- What hyprland has retired is skipped: an older oracle wrote it, and setting
+-- it now only earns a deprecation (oracle.js HYPR_RETIRED drops it too).
+local retired = { ["dwindle:special_scale_factor"] = true }
 local okHl, hlFile = pcall(require, "lua.hyprland")
 if okHl and type(hlFile) == "table" then
 	local spaces = {}
@@ -347,7 +350,7 @@ if okHl and type(hlFile) == "table" then
 			elseif ws then
 				spaces[ws] = spaces[ws] or {}
 				spaces[ws][field] = v
-			elseif not k:find("^zen:") then
+			elseif not k:find("^zen:") and not retired[k] then
 				if type(v) == "string" then
 					local a, b = v:match("^%s*(-?[%d.]+)%s+(-?[%d.]+)%s*$")
 					if a then v = { tonumber(a), tonumber(b) } end

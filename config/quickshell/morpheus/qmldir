@@ -62,6 +62,7 @@ ChosenFlash 1.0 ChosenFlash.qml
 RowFlash 1.0 RowFlash.qml
 FlashOver 1.0 FlashOver.qml
 Caret 1.0 Caret.qml
+WallClock 1.0 WallClock.qml
 InputShield 1.0 InputShield.qml
 KeyCap 1.0 KeyCap.qml
 HintRow 1.0 HintRow.qml

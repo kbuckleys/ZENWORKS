@@ -1954,6 +1954,7 @@ function parseInputLua(text) {
   let m;
   while ((m = re.exec(src)) !== null) {
     const raw = m[2];
+    if (HYPR_RETIRED.indexOf(m[1]) >= 0) continue;
     out[m[1]] = m[3] !== undefined ? m[3].replace(/\\(.)/g, "$1")
       : raw === "true" ? true : raw === "false" ? false : Number(raw);
   }
@@ -2652,7 +2653,7 @@ const HYPR_FIELDS = [
     label: "Resize toward the pointer", alias: "dwindle smart resizing mouse",
     help: "Resizing with the mouse moves the edge nearest the pointer." },
   // dwindle:special_scale_factor left out: deprecated in 0.57 ("use
-  // workspace rules"), and Health's Hyprland config row lists it
+  // workspace rules"); HYPR_RETIRED drops it from older files
   { key: "master:mfact", section: "tiling", part: "Master", def: 0.55, type: "real", min: 0.1, max: 0.9, step: 0.05,
     label: "Master size", alias: "master mfact size ratio",
     help: "How much of the screen the master window takes." },
@@ -3034,8 +3035,12 @@ function hyprSanitize(raw) {
   return out;
 }
 
+// settings hyprland has retired, which an older oracle wrote: never kept as
+// "written by hand" (base.lua skips them as well)
+const HYPR_RETIRED = ["dwindle:special_scale_factor"];
+
 // ["a:b"] = "text" | number | true | false, comments ignored; anything this
-// list does not know is kept as it was
+// list does not know is kept as it was, but for what hyprland has retired
 function parseHyprLua(text) {
   const out = ({});
   const src = stripLuaComments(String(text || ""));
@@ -3043,6 +3048,7 @@ function parseHyprLua(text) {
   let m;
   while ((m = re.exec(src)) !== null) {
     const raw = m[2];
+    if (HYPR_RETIRED.indexOf(m[1]) >= 0) continue;
     out[m[1]] = m[3] !== undefined ? m[3].replace(/\\(.)/g, "$1")
       : raw === "true" ? true : raw === "false" ? false : Number(raw);
   }

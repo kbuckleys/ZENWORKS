@@ -123,6 +123,29 @@ def info(root, pkg):
     return out
 
 
+# THE PACKAGER (2026-10-30). makepkg writes $PACKAGER into the package it
+# builds, and that is the builder's makepkg.conf — unset, "Unknown
+# Packager", for nearly everyone building from the AUR. Set in the recipe
+# it wins over that, so every package Delphi makes says who made it.
+PACKAGER = "Zenworks Delphi"
+
+
+def stamp(root):
+    """PACKAGER="Zenworks Delphi" in the PKGBUILD, under pkgrel= (or in
+    place of one it had). Written only when it changes, so a .SRCINFO
+    already in step stays in step."""
+    path = os.path.join(root, "PKGBUILD")
+    text = open(path).read()
+    line = 'PACKAGER="' + PACKAGER + '"'
+    if re.search(r"^PACKAGER=", text, re.M):
+        new = re.sub(r"^PACKAGER=.*$", line, text, count=1, flags=re.M)
+    else:
+        new = re.sub(r"^(pkgrel=.*)$", lambda m: m.group(1) + "\n" + line, text, count=1, flags=re.M)
+    if new != text:
+        with open(path, "w") as f:
+            f.write(new)
+
+
 def set_version(root, version):
     """pkgver to `version` with pkgrel 1, or — the same version again —
     pkgrel one up: a change to the recipe alone."""
@@ -168,6 +191,7 @@ def sums(root, cancel):
         for name in os.listdir(root):
             if name.endswith("-" + ver + ".tar.gz") and os.path.isfile(os.path.join(root, name)):
                 os.remove(os.path.join(root, name))
+    stamp(root)
     code, said = _run(["updpkgsums"], root, cancel)
     if code != 0:
         raise AurError("The checksums were not updated:\n" + "\n".join(said[-8:]))
@@ -307,7 +331,9 @@ _NOISE = re.compile(r"may not be needed|implicitly satisfied|symlink .* points t
 
 def build(root, cancel):
     """Built from the real source, nothing installed for it (-d), then
-    namcap on the recipe and the package: { package, notes }."""
+    namcap on the recipe and the package: { package, notes }. A VCS
+    package's release is its build: stamped here, before its .SRCINFO."""
+    stamp(root)
     code, said = _run(["makepkg", "-fd", "--noconfirm"], root, cancel)
     if code != 0:
         raise AurError("The build failed:\n" + "\n".join(said[-12:]))

@@ -688,6 +688,7 @@ def write(spec):
         if not aur._VERSION.match(ver):
             raise NewError("A release needs a version makepkg takes (1.2.3)")
         lines += ["pkgver=" + ver, "pkgrel=1"]
+    lines.append('PACKAGER="' + aur.PACKAGER + '"')
     lines += ["pkgdesc=" + _q(spec.get("description") or ""),
               "arch=" + _arr([spec.get("arch") or "x86_64"]),
               "url=" + _q(spec.get("url") or src),

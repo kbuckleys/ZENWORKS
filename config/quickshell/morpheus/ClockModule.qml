@@ -4,7 +4,6 @@
 // https://github.com/kbuckleys/
 
 import QtQuick
-import Quickshell
 import "helpers.js" as Helpers
 // a library: the same copy chronos itself uses
 import "../chronos/chronos.js" as Chr
@@ -116,13 +115,12 @@ Item {
     return ((clock.hours + 11) % 12) + 1;
   }
 
-  SystemClock {
+  WallClock {
     id: clock
     // Seconds means a repaint a second rather than a repaint a minute, which
     // is sixty times the work for a digit most bars do not carry — so it is
     // only asked for when it is actually being shown.
-    precision: Oracle.clockSeconds ? SystemClock.Seconds : SystemClock.Minutes
-    enabled: true
+    withSeconds: Oracle.clockSeconds
   }
 
   // What today is, in one line. The month grid that used to hang off this
