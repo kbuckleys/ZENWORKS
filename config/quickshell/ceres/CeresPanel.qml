@@ -225,6 +225,7 @@ LayerPopup {
         if (k === Qt.Key_Return || k === Qt.Key_Enter) { event.accepted = true; Ceres.txClear(); }
         else if (k === Qt.Key_T && Ceres.txState === "failed") { event.accepted = true; Ceres.txInTerminal(); popup.closePopup(); }
         else if (k === Qt.Key_Y && tx.settleable) { event.accepted = true; tx.settle(); }
+        else if (k === Qt.Key_Y && Ceres.txUnholdable) { event.accepted = true; Ceres.txUnheldRun(); }
         else if ((k === Qt.Key_Left || k === Qt.Key_Right) && tx.settling) {
           event.accepted = true;
           tx.pickNext(k === Qt.Key_Left ? -1 : 1);
@@ -440,6 +441,7 @@ LayerPopup {
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
               u: modelData.head ? null : modelData.u
+              pending: !!modelData.aur
             }
           }
         }
@@ -499,6 +501,7 @@ LayerPopup {
           case "news": return [["return", "continue"], ["esc", "back"]];
           }
           if (tx.settleable) return [["y", "resolve"], ["t", "open in terminal"], ["return", "back"]];
+          if (Ceres.txUnholdable) return [["y", "install anyway"], ["t", "open in terminal"], ["return", "back"]];
           return Ceres.txState === "failed"
             ? [["t", "open in terminal"], ["return", "back"]]
             : [["return", "back"]];
@@ -523,6 +526,13 @@ LayerPopup {
           ink: Zenon.cyan
           primary: true
           onClicked: tx.settle()
+        }
+        DialogButton {
+          visible: popup.face === "result" && Ceres.txUnholdable
+          label: "Install anyway"
+          ink: Zenon.cyan
+          primary: true
+          onClicked: Ceres.txUnheldRun()
         }
         DialogButton {
           visible: popup.face === "result" && Ceres.txState === "failed"

@@ -18,6 +18,43 @@ const { execFileSync } = require("child_process");
 module.exports = {
   module: "ceres/ceres.js",
   cases: (C, t) => {
+    // ── held back: paru's minimum release age ─────────────────────────────
+    {
+    const day = 86400000, now = 100 * day;
+    const rule = { secs: 3 * 86400, exclude: ["trusted-*"], devel: ["-git"] };
+    const ups = [{ name: "fresh" }, { name: "old" }, { name: "tool-git" }, { name: "trusted-x" }, { name: "unknown" }];
+    const ages = { "fresh": now - day, "old": now - 5 * day, "tool-git": now - 1000, "trusted-x": now - 1000 };
+    t.eq("only the fresh one waits, with when it clears", C.heldOf(ups, rule, ages, now), [{ name: "fresh", until: now + 2 * day }]);
+    t.eq("no age, nothing held", C.heldOf(ups, { secs: 0 }, ages, now), []);
+    t.eq("no answer from the AUR, nothing held", C.heldOf(ups, rule, null, now), []);
+    t.eq("a full upgrade leaves them out", C.withHeld([["-Syu"]], ["a", "b"]), [["-Syu", "--ignore", "a,b"]]);
+    const plain = [["-S", "--needed", "x"]];
+    t.ok("other steps are the very same list", C.withHeld(plain, ["a"]) === plain);
+    t.eq("setup's pacman -Syu untouched", C.withHeld([["@sudo", "pacman", "-Syu"]], ["a"]), [["@sudo", "pacman", "-Syu"]]);
+    t.eq("globs", [C.globRe("foo-*").test("foo-bar"), C.globRe("a[bc]?").test("acx"), C.globRe("a.b").test("axb"),
+                   C.globRe("x[!y]").test("xy")], [true, true, false, false]);
+    t.eq("ages read off the RPC", C.readAurAges('{"results":[{"Name":"a","LastModified":10}]}\n@@exit 0\n'), { a: 10000 });
+    t.eq("a failed RPC is no answer", C.readAurAges("\n@@exit 22\n"), null);
+    t.has("names quoted for the POST", C.aurAgesCommand(["a;b"]), "--data-urlencode 'arg[]=a;b'");
+    t.eq("ages in words", [259200, 604800, 86400, 43200, 90].map(C.ageWords), ["3 days", "1 week", "1 day", "12 hours", "90 seconds"]);
+    const refusal = C.ageRefusalOf(["==> stuff",
+      "error: the following AUR packages are newer than the minimum release age of 3 days: foo (updated 5 hours ago), bar (updated 1 day ago)",
+      "    pass --nominimumreleaseage with your operation to override (e.g. paru -Syu --nominimumreleaseage), or add a package to MinimumReleaseAgeExclude"]);
+    t.eq("paru's refusal read", refusal, { age: "3 days", packages: [{ name: "foo", ago: "5 hours" }, { name: "bar", ago: "1 day" }] });
+    t.eq("said as a sentence", C.ageRefusalLine({ age: "3 days", packages: [{ name: "foo", ago: "5 hours" }] }),
+      "foo changed on the AUR 5 hours ago \u2014 paru holds back AUR changes newer than 3 days");
+    t.eq("no refusal, nothing to override", C.ageRefusalOf(["error: target not found: x"]), null);
+    t.eq("past the age this once, on paru's -S steps only",
+      C.unheldSteps([["-S", "--needed", "x"], ["@sudo", "pacman", "-D", "--asdeps", "y"]]),
+      [["-S", "--nominimumreleaseage", "--needed", "x"], ["@sudo", "pacman", "-D", "--asdeps", "y"]]);
+    t.eq("paru.conf read with its path", C.readParuConf("@@path /etc/paru.conf\n[options]\nDevel\n"),
+      { path: "/etc/paru.conf", lines: ["[options]", "Devel"] });
+    t.eq("no path line, nothing read", C.readParuConf(""), { path: "", lines: [] });
+    t.eq("the system's paru.conf as root", C.paruConfSteps("/etc/paru.conf", "x\n")[0].slice(0, 3), ["@sudo", "sh", "-c"]);
+    t.eq("yours as you", C.paruConfSteps("/home/b/.config/paru/paru.conf", "x\n")[0][0], "@user");
+    t.ok("and needs no password", !C.needsRoot(C.paruConfSteps("/home/b/.config/paru/paru.conf", "x\n")));
+    }
+
     // ── the exit mark ─────────────────────────────────────────────────────
     t.eq("mark read and removed", C.splitExit("a\nb\n@@exit 2\n"),
       { lines: ["a", "b", ""], code: 2 });

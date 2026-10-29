@@ -626,7 +626,151 @@ Singleton {
   // most machine-specific thing a default could be.
   property string lockWidgetMonitor: ""
 
-  // ── time and weather ──────────────────────────────────────────────────
+  // ── TIME & DATE: systemd's, not oracle.json's (2026-10-29) ────────────
+  // `timedatectl show`, read on the page's arrival and after every change
+  // (Ora.parseTimedate); zone.tab's cities, once (Ora.parseZoneTab)
+  property var timedate: ({ zone: "", ntp: false, canNtp: false, synced: false, localRtc: false, abbrev: "" })
+  property var zones: []
+  // the region chosen on the Time zone row before a city in it is: the
+  // city chip lists its cities, and nothing changes until one is picked
+  property string tzRegionPick: ""
+  readonly property string tzRegion: root.tzRegionPick !== "" ? root.tzRegionPick : Ora.zoneRegion(root.timedate.zone)
+  // bumped when the zone moves: what reads the time of day re-reads it
+  property int tzRevision: 0
+
+  // The rows, built like the input devices': `sysTime` keeps them out of
+  // oracle.json, the changed counts and every reset — they are this
+  // computer as it is, not a choice of the shell's
+  function timeSpecs() {
+    const td = root.timedate;
+    const out = [
+      { key: "tz:region", section: "datetime", sysTime: true, type: "enum", label: "Time zone",
+        options: Ora.zoneRegionOptions(root.zones, td.zone), also: ["tz:zone"], chipW: 130,
+        alias: "time zone timezone region city country continent utc gmt",
+        help: "Where the clock's hours come from: pick the region, then the city, or click the map. Changing it asks for your password." },
+      { key: "tz:zone", section: "datetime", sysTime: true, within: "tz:region", type: "enum", label: "City",
+        options: Ora.zoneCityOptions(root.zones, root.tzRegion, td.zone), chipW: 200, open: true, emptyLabel: "Choose a city" }
+    ];
+    if (td.canNtp)
+      // ON BY DEFAULT (user, 2026-10-29): off is counted as changed, and
+      // its restore glyph turns it back on (`sysDefault`, buildSchema)
+      out.push({ key: "tz:ntp", section: "datetime", sysTime: true, sysDefault: true, type: "bool", label: "Set the time automatically",
+        alias: "ntp network time sync timesyncd internet clock",
+        help: "systemd-timesyncd keeps the clock right over the network." });
+    out.push({ key: "tz:localRtc", section: "datetime", sysTime: true, type: "bool", label: "Hardware clock in local time",
+      alias: "rtc bios hardware clock windows dual boot utc local",
+      help: "Only for a computer that also starts Windows, which keeps the hardware clock in local time. Off keeps it in UTC, as Linux expects." });
+    return out;
+  }
+  function timeValue(key) {
+    if (key === "tz:region") return root.tzRegion;
+    // a region picked and no city in it yet: the chip says to choose one
+    if (key === "tz:zone") return root.tzRegionPick !== "" ? "" : root.timedate.zone;
+    if (key === "tz:ntp") return root.timedate.ntp;
+    if (key === "tz:localRtc") return root.timedate.localRtc;
+    return undefined;
+  }
+  function setTime(key, value) {
+    if (key === "tz:region") {
+      const r = String(value);
+      root.tzRegionPick = r === Ora.zoneRegion(root.timedate.zone) ? "" : r;
+      root.buildSchema();
+      root.revision++;
+      return;
+    }
+    if (key === "tz:zone") { root.setTimeZone(String(value)); return; }
+    if (key === "tz:ntp" && Boolean(value) !== root.timedate.ntp)
+      root.timedateRun(["timedatectl", "set-ntp", value ? "true" : "false"]);
+    if (key === "tz:localRtc" && Boolean(value) !== root.timedate.localRtc)
+      root.timedateRun(["timedatectl", "set-local-rtc", value ? "1" : "0"]);
+  }
+  // what a click on the map calls too
+  function setTimeZone(zone) {
+    if (zone === "" || zone === root.timedate.zone) {
+      root.tzRegionPick = "";
+      root.buildSchema();
+      root.revision++;
+      return;
+    }
+    root.timedateRun(["timedatectl", "set-timezone", zone]);
+  }
+  function timedateRun(cmd) {
+    if (timedateSet.running) return;
+    timedateSet.command = cmd;
+    timedateSet.running = true;
+  }
+  function readTimedate() {
+    if (!timedateRead.running) timedateRead.running = true;
+  }
+  Process {
+    id: timedateSet
+    // polkit asks for the password; a refusal is a non-zero exit
+    onExited: (code) => {
+      if (code !== 0)
+        Quickshell.execDetached(["notify-send", "-a", "oracle", "--", "Time & date",
+          "Nothing was changed: the system said no (code " + code + ")."]);
+      root.readTimedate();
+    }
+  }
+  Process {
+    id: timedateRead
+    command: ["timedatectl", "show"]
+    stdout: StdioCollector {
+      id: timedateOut
+      waitForEnd: true
+      onStreamFinished: {
+        const td = Ora.parseTimedate(timedateOut.text);
+        if (td.zone === "") return;
+        const moved = td.zone !== root.timedate.zone;
+        root.timedate = td;
+        root.ntpOnce(td);
+        if (moved) {
+          root.tzRegionPick = "";
+          // the shell's own Date keeps the zone it started in until told
+          Date.timeZoneUpdated();
+          root.tzRevision++;
+        }
+        if (root.defaultsTaken) root.buildSchema();
+        root.revision++;
+      }
+    }
+  }
+  // THE NETWORK CLOCK, ON ONCE: the first time the shell finds it off
+  // where it could be on, it turns it on, and notes in timedate.json that it
+  // did — turned off after that, it stays off
+  property bool ntpNoted: false
+  function ntpOnce(td) {
+    if (!ntpMark.loadedOnce || root.ntpNoted || td.zone === "") return;
+    root.ntpNoted = true;
+    ntpMark.setText(JSON.stringify({ ntpDefaulted: true }) + "\n");
+    if (td.canNtp && !td.ntp) root.timedateRun(["timedatectl", "set-ntp", "true"]);
+  }
+  FileView {
+    id: ntpMark
+    property bool loadedOnce: false
+    path: Quickshell.statePath("timedate.json")
+    printErrors: false
+    onLoaded: { root.ntpNoted = true; loadedOnce = true; }
+    onLoadFailed: { loadedOnce = true; root.ntpOnce(root.timedate); }
+  }
+  FileView {
+    path: "/usr/share/zoneinfo/zone.tab"
+    printErrors: false
+    onLoaded: {
+      root.zones = Ora.parseZoneTab(text());
+      if (root.defaultsTaken) root.buildSchema();
+    }
+  }
+  // the Now row's minute, while anything asks for it
+  property int minuteTick: 0
+  Timer {
+    interval: 60000 - Date.now() % 60000 + 50
+    running: root.timedate.zone !== ""
+    repeat: true
+    onTriggered: { interval = 60000 - Date.now() % 60000 + 50; root.minuteTick++; root.revision++; }
+  }
+
+  // ── the clock ─────────────────────────────────────────────────────────
   property bool clock24h: true
   // A second hand is a second of work every second — the clock re-renders at
   // 1Hz instead of once a minute — so it is off unless asked for.
@@ -711,6 +855,9 @@ Singleton {
       blurb: "the type every component reads \u2014 the font, the monospace, their sizes" },
     { id: "surfaces", group: "looks", label: "Surfaces", icon: "\uF24D",
       blurb: "what every layer is made of \u2014 the corners, the width, opacity, shadows and frost" },
+    // hyprland's blur, shadow, glow and corners in detail (2026-10-29)
+    { id: "wineffects", group: "looks", label: "Window effects", icon: "\uF0D0",
+      blurb: "hyprland's blur, glass, shadow, inner glow, corner shape and motion blur" },
     { id: "motion", group: "looks", label: "Motion", icon: "",
       blurb: "how long everything takes, and how scrolling feels" },
     { id: "paper", group: "looks", label: "Background", icon: "",
@@ -720,6 +867,10 @@ Singleton {
       blurb: "hyprland's monitors \u2014 resolution, refresh, scale, rotation" },
     { id: "windows", group: "desktop", label: "Windows", icon: "\uF2D2",
       blurb: "hyprland's window rules \u2014 how each app's windows open \u2014 what starts at login, and the workspace strip" },
+    { id: "tiling", group: "desktop", label: "Tiling", icon: "\uF00A",
+      blurb: "hyprland's layouts \u2014 Dwindle, Master, Scrolling \u2014 and window groups with tabs" },
+    { id: "workspaces", group: "desktop", label: "Workspaces", icon: "\uF2D0",
+      blurb: "switching workspaces, and each workspace's screen and layout" },
     { id: "bar", group: "desktop", label: "Bar", icon: "",
       blurb: "morpheus — the pill and what it carries" },
     { id: "menu", group: "desktop", label: "Desktop menu", icon: "",
@@ -732,8 +883,14 @@ Singleton {
     // ── ALERTS & TIME: what calls for you, and when ──
     { id: "notify", group: "alerts", label: "Notifications", icon: "",
       blurb: "howler — toasts, and what the bell remembers" },
-    { id: "time", group: "alerts", label: "Time & weather", icon: "",
-      blurb: "chronos — the clock, the calendar, the forecast" },
+    // TIME & DATE (user, 2026-10-29: dedicated settings, with a world map;
+    // "Time & Date", not "Date & time"):
+    // the time zone and the clocks; the forecast and the calendar stay on
+    // the page that was "Time & weather"
+    { id: "datetime", group: "alerts", label: "Time & date", icon: "\uF017",
+      blurb: "the time zone, the clock in the bar, and how the clock is kept right" },
+    { id: "time", group: "alerts", label: "Weather & calendar", icon: "\uE302",
+      blurb: "chronos — the forecast and the calendar" },
     { id: "screentime", group: "alerts", label: "Screen time", icon: "\uF253",
       blurb: "kairos \u2014 what is counted, and the reminders to take a break" },
     { id: "idle", group: "alerts", label: "Idle & lock", icon: "",
@@ -1245,9 +1402,17 @@ Singleton {
       min: 0.1, max: 0.6, step: 0.01,
       help: "As a fraction of the monitor's width. It never goes below 240px whatever this says." },
 
-    // ── time & weather ──
-    { key: "clock24h", section: "time", label: "24-hour clock", type: "bool", sample: "clock" },
-    { key: "clockSeconds", section: "time", label: "Show seconds", type: "bool",
+    // ── date & time ──
+    // the map: where the sun is up, and the time zone's city (WorldMap.qml).
+    // A click on it picks the nearest city's zone. The zone and the two
+    // clock rows under it are timedatectl's (timeSpecs).
+    { key: "timeMap", section: "datetime", type: "sample", sample: "map", label: "World map",
+      alias: "time zone timezone map world day night sun terminator city" },
+    { key: "infoTimeNow", section: "datetime", label: "Now", type: "info",
+      alias: "time zone offset utc gmt synchronized ntp",
+      help: "The time here, its zone's offset from UTC, and whether the network clock has set it." },
+    { key: "clock24h", section: "datetime", label: "24-hour clock", type: "bool", sample: "clock" },
+    { key: "clockSeconds", section: "datetime", label: "Show seconds", type: "bool",
       help: "The clock then repaints once a second rather than once a minute." },
     { key: "weatherFahrenheit", section: "time", label: "Fahrenheit", type: "bool",
       help: "Every temperature chronos shows, in °F instead of °C." },
@@ -1366,7 +1531,7 @@ Singleton {
     // Two rows that fold open into their lists: WindowRules.qml and
     // StartupApps.qml (fold "rules", "startup"). The lists live in hypr
     // files Oracle writes and reads back — see Ora's WINDOW RULES, STARTUP.
-    { key: "workspaceStrip", section: "windows", alias: "workspace strip switcher osd overview numbers switch",
+    { key: "workspaceStrip", section: "workspaces", alias: "workspace strip switcher osd overview numbers switch",
       label: "Workspace strip", type: "bool",
       help: "Every time the workspace changes, its number and the apps on each workspace show low on the screen for a moment." },
     // hyprland's windows, kept in hypr/lua/effects.lua beside the shadows
@@ -1383,7 +1548,7 @@ Singleton {
     { key: "hyprBorder", section: "windows", label: "Border width", type: "int", min: 0, max: 5, step: 1, unit: "px",
       hyprFile: "effects", fx: "border_size", hyprDefault: 1, alias: "border outline frame thickness",
       help: "The line round every window, in the theme's colors. 0 draws none." },
-    { key: "hyprLayout", section: "windows", label: "Tiling layout", type: "enum", segments: true, art: "layout",
+    { key: "hyprLayout", section: "tiling", label: "Tiling layout", type: "enum", segments: true, art: "layout",
       hyprFile: "effects", fx: "layout", hyprDefault: "dwindle", alias: "layout tiling dwindle master scrolling columns",
       options: [ { value: "dwindle", label: "Dwindle" }, { value: "master", label: "Master" }, { value: "scrolling", label: "Scrolling" } ],
       help: "How new windows share a workspace. Dwindle splits the space each time; Master keeps one big window and stacks the rest; Scrolling sets them side by side in a strip you scroll through. A workspace switched with the layout bind keeps its own." },
@@ -1612,11 +1777,25 @@ Singleton {
       }
       out.push(is[i]);
     }
+    // hyprland's own rows (Ora's HYPRLAND). Their defaults are fixed there.
+    const hs = root.hyprSpecs();
+    for (let i = 0; i < hs.length; ++i) {
+      if (Ora.stored(hs[i])) d[hs[i].key] = hs[i].fallback;
+      out.push(hs[i]);
+    }
     // Input methods' rows, under the devices'. Their defaults are fixed.
     const ims = root.imSpecs();
     for (let i = 0; i < ims.length; ++i) {
       if (Ora.stored(ims[i])) d[ims[i].key] = ims[i].fallback;
       out.push(ims[i]);
+    }
+    // The time zone's rows. Never counted as changed (sysTime); a default
+    // only so each has one.
+    const ts = root.timeSpecs();
+    for (let i = 0; i < ts.length; ++i) {
+      d[ts[i].key] = ts[i].sysDefault === true ? true : ts[i].type === "bool" ? false : "";
+      ts[i].fallback = d[ts[i].key];
+      out.push(ts[i]);
     }
     // The binds' rows. Their defaults are binds.lua's own chords.
     const ks = root.keysSpecs();
@@ -1692,6 +1871,15 @@ Singleton {
       for (let i = 0; i < sc.length; ++i)
         out.push(sc[i].name + " " + sc[i].width + "\u00d7" + sc[i].height);
       return out.length ? out.join("   ") : "none";
+    }
+    if (key === "infoTimeNow") {
+      root.minuteTick;
+      const td = root.timedate;
+      if (td.zone === "") return "reading\u2026";
+      const now = new Date();
+      const t = Qt.formatTime(now, root.clock24h ? "HH:mm" : "h:mm AP");
+      return t + (td.abbrev ? " " + td.abbrev : "") + " \u00b7 " + Ora.utcOffsetText(-now.getTimezoneOffset())
+        + (td.ntp ? (td.synced ? " \u00b7 synchronized" : " \u00b7 not synchronized yet") : "");
     }
     if (key === "infoLaunched") {
       const d = Quickshell.launchTime;
@@ -1800,8 +1988,10 @@ Singleton {
     if (String(key).indexOf("display:") === 0) return root.displayValues[key];
     if (String(key).indexOf("default:") === 0) return root.appDefaults[key];
     if (String(key).indexOf("input:") === 0) return root.inputValues[key];
+    if (String(key).indexOf("hl:") === 0) return root.hyprValues[key];
     if (String(key).indexOf("im:") === 0) return root.imValue(key);
     if (String(key).indexOf("bind:") === 0) return root.keyValues[key];
+    if (String(key).indexOf("tz:") === 0) return root.timeValue(key);
     return root[key];
   }
 
@@ -1866,8 +2056,10 @@ Singleton {
   function _set(s, key, value) {
     if (!s.display && !Ora.same(root.get(key), Ora.coerce(s, value))) root._note(key, root.get(key));
     if (s.display) { root.setDisplay(s, value); return; }
+    if (s.sysTime) { root.setTime(key, value); return; }
     if (s.appDefault) { root.setAppDefault(s, value); return; }
     if (s.input) { root.setInput(s, value); return; }
+    if (s.hl) { root.setHypr(s, value); return; }
     if (s.im) { root.setIm(s, value); return; }
     if (s.bindKey) { root.setBind(s, value); return; }
     if (s.hyprFile === "effects") { root.setEffect(key, value); return; }
@@ -1908,7 +2100,8 @@ Singleton {
       const s = root.schema[i];
       // the monitors too: each goes through setDisplay, so the lot is one
       // write and one "keep these settings?", and comes back by itself
-      if (!Ora.stored(s) || s.section !== section) continue;
+      // the time zone is the computer's, never a default to go back to
+      if (!Ora.stored(s) || (s.sysTime && !s.sysDefault) || s.section !== section) continue;
       root.reset(s.key);
     }
   }
@@ -1924,7 +2117,7 @@ Singleton {
   function _resetAll() {
     for (let i = 0; i < root.schema.length; ++i) {
       const s = root.schema[i];
-      if (Ora.stored(s) && !s.display && !s.appDefault && !s.input && !s.bindKey && !s.hyprFile) root.reset(s.key);
+      if (Ora.stored(s) && !s.display && !s.sysTime && !s.appDefault && !s.input && !s.hl && !s.bindKey && !s.hyprFile) root.reset(s.key);
     }
   }
 
@@ -1946,7 +2139,7 @@ Singleton {
     const out = { "": 0 };
     for (let i = 0; i < root.schema.length; ++i) {
       const s = root.schema[i];
-      if (s.display || !Ora.stored(s)) continue;
+      if (s.display || (s.sysTime && !s.sysDefault) || !Ora.stored(s)) continue;
       if (Ora.same(root.get(s.key), root.defaults[s.key])) continue;
       out[""]++;
       out[s.section] = (out[s.section] || 0) + 1;
@@ -2855,6 +3048,92 @@ Singleton {
     onLoadFailed: { root.keysRaw = ({}); root.syncKeyValues(); }
   }
 
+  // ── HYPRLAND ──────────────────────────────────────────────────────────
+  // The rest of hyprland's settings, kept in hypr/lua/hyprland.lua — see
+  // Ora's HYPRLAND. Applied by reloading hyprland, as input.lua is.
+  // key ("hl:misc:vrr") -> value, as the file says
+  property var hyprValues: ({})
+  // what the file holds, hand-written keys too, so a write carries them
+  property var hyprRaw: ({})
+  property bool hyprLoaded: false
+  readonly property string hyprPath: root.hyprLuaDir + "/hyprland.lua"
+
+  // the rows; a page with no parts in Ora's PAGES (Keyboard & mouse,
+  // Display) gets a header row before each part's first
+  function hyprSpecs() {
+    const out = [];
+    const screens = root.displays.map((m) => m.name);
+    const headed = ({});
+    for (const f of Ora.hyprFields()) {
+      if (!Ora.pageLayout(f.section) && !headed[f.section + ":" + f.part]) {
+        headed[f.section + ":" + f.part] = true;
+        out.push({ key: "hlHead:" + f.section + ":" + f.part, section: f.section, type: "info",
+          label: f.part, help: "", alias: f.part.toLowerCase() });
+      }
+      out.push(Ora.hyprSpec(f, screens));
+    }
+    return out;
+  }
+
+  function syncHyprValues(raw) {
+    const vals = ({});
+    for (const f of Ora.hyprFields()) {
+      const s = root.spec("hl:" + f.key);
+      const v = raw[f.key] === undefined ? f.def : raw[f.key];
+      vals["hl:" + f.key] = s ? Ora.coerce(s, v) : v;
+    }
+    root.hyprRaw = raw;
+    root.hyprValues = vals;
+    root.revision++;
+  }
+
+  function setHypr(s, value) {
+    const v = Ora.coerce(s, value);
+    if (Ora.same(root.hyprValues[s.key], v)) return;
+    const next = ({});
+    for (const k in root.hyprValues) next[k] = root.hyprValues[k];
+    next[s.key] = v;
+    root.hyprValues = next;
+    root.revision++;
+    hyprSaveTimer.restart();
+  }
+
+  function writeHypr() {
+    const out = ({});
+    for (const k in root.hyprRaw) out[k] = root.hyprRaw[k];
+    for (const f of Ora.hyprFields()) out[f.key] = root.hyprValues["hl:" + f.key];
+    root.hyprRaw = out;
+    hyprFile.setText(Ora.renderHyprLua(out));
+    reloadHypr.restart();
+  }
+
+  Timer {
+    id: hyprSaveTimer
+    // a slider dragged is a burst of sets; hyprland reloads once, at the end
+    interval: 500
+    onTriggered: root.writeHypr()
+  }
+
+  FileView {
+    id: hyprFile
+    path: root.hyprPath
+    blockLoading: true
+    printErrors: false
+    watchChanges: true
+    onFileChanged: reload()
+    // FileView's own write never fires loaded: setHypr sets the values itself
+    onLoaded: {
+      const first = !root.hyprLoaded;
+      const before = root.hyprValues;
+      root.hyprLoaded = true;
+      root.syncHyprValues(Ora.parseHyprLua(hyprFile.text()));
+      if (first) return;
+      for (const k in root.hyprValues)
+        if (!Ora.same(before[k], root.hyprValues[k])) { reloadHypr.restart(); return; }
+    }
+    onLoadFailed: { root.hyprLoaded = true; root.syncHyprValues(({})); }
+  }
+
   // ── INPUT ─────────────────────────────────────────────────────────────
   // Every input setting hyprland has. The values are kept in
   // hypr/lua/input.lua, not in oracle.json: see Ora's INPUT for why, and for
@@ -3326,7 +3605,7 @@ Singleton {
 
   function save() {
     const vals = ({});
-    const own = root.schema.filter((s) => !s.display && !s.appDefault && !s.input && !s.bindKey && !s.hyprFile);
+    const own = root.schema.filter((s) => !s.display && !s.sysTime && !s.appDefault && !s.input && !s.hl && !s.bindKey && !s.hyprFile);
     for (let i = 0; i < own.length; ++i) {
       const s = own[i];
       if (Ora.stored(s)) vals[s.key] = root[s.key];
@@ -3408,7 +3687,7 @@ Singleton {
       const out = [];
       for (let i = 0; i < root.schema.length; ++i) {
         const s = root.schema[i];
-        if (!Ora.stored(s) || s.display || s.appDefault || s.input || s.bindKey || s.hyprFile || root.isDefault(s.key)) continue;
+        if (!Ora.stored(s) || s.display || s.sysTime || s.appDefault || s.input || s.hl || s.bindKey || s.hyprFile || root.isDefault(s.key)) continue;
         out.push(s.key + " = " + String(root[s.key])
           + "  (default " + String(root.defaults[s.key]) + ")");
       }
@@ -3427,6 +3706,7 @@ Singleton {
     root.scanFonts();
     root.scanDisplays();
     root.scanInputDevices();
+    root.readTimedate();
     appsFirstScan.start();
   }
 }

@@ -110,7 +110,10 @@ module.exports = {
     t.eq("the network off", S.overrideFlag(row(plain, "network"), false), "--unshare=network");
     t.eq("yours, with no root", S.overrideSteps("a.b", "user", "--nofilesystem=home")[0][0], "@user");
     t.eq("the system's, as root", S.overrideSteps("a.b", "system", "--nofilesystem=home")[0].slice(0, 4), ["@sudo", "flatpak", "override", "--system"]);
-    t.has("reset", S.overrideResetSteps("a.b", "user")[0][1], "--reset a.b");
+    t.has("reset", S.overrideResetSteps("a.b", "user")[0][1], "--reset 'a.b'");
+    // the id and the flag are quoted in the user's shell line (audit 10-28d)
+    t.eq("a ; in a path stays the path's", S.overrideSteps("a.b", "user", "--filesystem=/x;rm")[0][1],
+      "flatpak override --user '--filesystem=/x;rm' 'a.b'");
     t.eq("a sealed app asks for nothing", S.permissions("[Context]\nsockets=wayland;\n"), []);
 
     // ── one app, more than one source ─────────────────────────────────────

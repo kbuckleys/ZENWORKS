@@ -481,14 +481,24 @@ LayerPopup {
           // The row's own icon, at the size oracle asks for — the image the
           // application sent if it survived being written down, and its
           // themed icon if it did not. See howler.js for which is which.
+          // A row with nothing to show takes no room for it (user,
+          // 2026-10-29): no empty box, the words start where it would have.
+          // Something to show is a picture that loaded, or the question mark
+          // for one that was named and cannot be had — as the toast's hasIcon.
           ClippingRectangle {
             id: shot
+            readonly property bool missing: (!!row.modelData.appIcon || !!row.modelData.rawImage)
+              && shotImg.pictures.length === 0
+              && (shotImg.source.toString() === "" || shotImg.status === Image.Error)
+            readonly property bool hasPicture: Howler.iconsEnabled && !row.event
+              && (shot.missing
+                  || (shotImg.source.toString() !== "" && shotImg.status !== Image.Error))
             anchors.left: parent.left
             anchors.leftMargin: 20
             anchors.verticalCenter: parent.verticalCenter
-            width: Howler.iconsEnabled && !row.event ? 40 : 0
+            width: shot.hasPicture ? 40 : 0
             height: 40
-            visible: Howler.iconsEnabled && !row.event
+            visible: shot.hasPicture
             radius: Howler.iconRadius
             color: "transparent"
 
@@ -525,9 +535,7 @@ LayerPopup {
             // named and not to be had: the question mark (Howler.missingGlyph)
             Text {
               anchors.centerIn: parent
-              visible: (!!row.modelData.appIcon || !!row.modelData.rawImage)
-                && Wolf.capturePictures(row.modelData).length === 0
-                && (shotImg.source.toString() === "" || shotImg.status === Image.Error)
+              visible: shot.missing
               text: Howler.missingGlyph
               color: Zenon.accentMuted
               font.family: Zenon.glyphFace
@@ -539,7 +547,7 @@ LayerPopup {
             textFormat: Text.PlainText
             id: appLine
             anchors.left: row.event ? rowTile.right : shot.right
-            anchors.leftMargin: row.event ? 16 : Howler.iconsEnabled ? 14 : 20
+            anchors.leftMargin: row.event ? 16 : shot.hasPicture ? 14 : 0
             anchors.right: stamp.left
             anchors.rightMargin: 10
             anchors.top: parent.top

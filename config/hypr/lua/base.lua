@@ -326,6 +326,53 @@ if okFx and type(fx) == "table" then
 	end
 end
 
+-- HYPRLAND: the rest of hyprland's settings, written by oracle (Windows,
+-- Tiling, Workspaces, Window effects, Motion, Keyboard & mouse, Display)
+-- to hyprland.lua as `["decoration:blur:size"] = 8`, hyprland's own names.
+-- Laid over everything above, one call each, so a value hyprland refuses
+-- costs that one. "" leaves a setting to hyprland; "0 10" is a pair.
+-- zen:gesture:<fingers>:<direction> = "<action>" is a touchpad gesture, and
+-- zen:ws:<n>:monitor / :layout a workspace's rule. Guarded like defaults.lua.
+local okHl, hlFile = pcall(require, "lua.hyprland")
+if okHl and type(hlFile) == "table" then
+	local spaces = {}
+	for k, v in pairs(hlFile) do
+		if type(k) == "string" and v ~= "" then
+			local fingers, dir = k:match("^zen:gesture:(%d):(%a+)$")
+			local ws, field = k:match("^zen:ws:(%d+):(%a+)$")
+			if fingers and type(v) == "string" then
+				local g = { fingers = tonumber(fingers), direction = dir, action = v }
+				if v == "special" then g.workspace_name = "special" end
+				pcall(hl.gesture, g)
+			elseif ws then
+				spaces[ws] = spaces[ws] or {}
+				spaces[ws][field] = v
+			elseif not k:find("^zen:") then
+				if type(v) == "string" then
+					local a, b = v:match("^%s*(-?[%d.]+)%s+(-?[%d.]+)%s*$")
+					if a then v = { tonumber(a), tonumber(b) } end
+				end
+				local cfg = {}
+				local node = cfg
+				local path = {}
+				for p in k:gmatch("[^:]+") do path[#path + 1] = p end
+				for i = 1, #path - 1 do
+					node[path[i]] = {}
+					node = node[path[i]]
+				end
+				node[path[#path]] = v
+				pcall(hl.config, cfg)
+			end
+		end
+	end
+	for ws, r in pairs(spaces) do
+		local rule = { workspace = ws }
+		if type(r.monitor) == "string" then rule.monitor = r.monitor end
+		if r.layout == "dwindle" or r.layout == "master" or r.layout == "scrolling" then rule.layout = r.layout end
+		pcall(hl.workspace_rule, rule)
+	end
+end
+
 -- THEME: the shell's theme, written to theme.lua by quickshell's ThemeSync
 -- whenever it changes (and `hyprctl reload` after). The colours above are
 -- Zenon's; an empty table — Zenon worn, or no file at all — leaves them.

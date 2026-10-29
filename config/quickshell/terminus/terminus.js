@@ -2563,7 +2563,10 @@ function parseProgress(text) {
 
 // How fast, and how long left, from the same rsync line as the percentage:
 //     32,768,000  45%   31.25MB/s    0:00:12 (xfr#1, to-chk=0/1)
-// { rate: "31.3 MB/s", eta: "0:12" }, or null for a line that says neither.
+// { rate: "31.3 MB/s", eta: "0:12", bps: 31250000 }, or null for a line that
+// says neither. `bps` is the same speed as a number, for the job's speed
+// graph (see Jobs' speeds) — in 1000s, so the graph's peak, written by
+// Helpers.powFormat, reads in the same figures as `rate` beside it.
 // The hours are dropped while there are none — "0:00:12" is a lot of zeros to
 // read for twelve seconds.
 function parseRate(text) {
@@ -2574,7 +2577,8 @@ function parseRate(text) {
   const h = parseInt(m[3], 10);
   return {
     rate: (n >= 100 ? Math.round(n) : n.toFixed(1)) + " " + (unit ? unit + "B" : "B") + "/s",
-    eta: h > 0 ? h + ":" + m[4] + ":" + m[5] : parseInt(m[4], 10) + ":" + m[5]
+    eta: h > 0 ? h + ":" + m[4] + ":" + m[5] : parseInt(m[4], 10) + ":" + m[5],
+    bps: n * Math.pow(1000, " KMGT".indexOf(unit || " "))
   };
 }
 

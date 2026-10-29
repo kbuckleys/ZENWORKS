@@ -43,7 +43,8 @@ FloatingWindow {
   onVisibleChanged: if (!aw.visible) Qt.callLater(() => { stopSave(); if (aw.mgr) aw.mgr.retire(aw); aw.destroy(); })
   onClosed: aw.visible = false
 
-  readonly property int headH: 60
+  // the suite's toolbar height, as Calendar's and Stylus' (user, 2026-10-29: 60 was "too fat")
+  readonly property int headH: Zenon.toolbarH
   readonly property int sideW: 300
 
   // ── THE CLIP ───────────────────────────────────────────────────────────

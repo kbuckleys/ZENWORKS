@@ -409,6 +409,142 @@ function versionSplit(from, to) {
 // anything less is a partial one, which Arch does not support.
 function upgradeSteps() { return [["-Syu"]]; }
 
+// ── HELD BACK: PARU'S MINIMUM RELEASE AGE ─────────────────────────────────
+// paru 2.2.0's MinimumReleaseAge refuses an AUR package changed more
+// recently than the age — and refuses the WHOLE -Syu with it, not that one
+// package: one fresh update would stop every AUR update until it aged. paru
+// -Qua still lists it. So Ceres asks the AUR when each update last changed,
+// marks the ones still too new, and a full upgrade leaves them out with
+// --ignore (paru honors it for the AUR too); they come in on the first
+// upgrade after they clear. Devel packages (DevelSuffixes) and
+// MinimumReleaseAgeExclude's globs are spared, exactly as paru spares them.
+
+// When each update last changed on the AUR: one POST for all of them.
+function aurAgesCommand(names) {
+  return "curl -fsS --max-time 20 https://aur.archlinux.org/rpc/v5/info "
+    + (names || []).map(n => "--data-urlencode " + q("arg[]=" + n)).join(" ")
+    + " 2>/dev/null; s=$?; echo; echo \"" + EXIT_MARK + "$s\"";
+}
+// → { name: LastModified in ms }, or null when the AUR did not answer
+function readAurAges(text) {
+  const r = splitExit(text);
+  if (r.code !== 0) return null;
+  let data = null;
+  try { data = JSON.parse(r.lines.join("\n").trim()); } catch (e) { return null; }
+  if (!data || !Array.isArray(data.results)) return null;
+  const out = {};
+  for (const x of data.results) if (x && x.Name && x.LastModified) out[x.Name] = Number(x.LastModified) * 1000;
+  return out;
+}
+
+// A shell glob (globset's *, ? and [..]) as a whole-name match.
+function globRe(g) {
+  let re = "";
+  for (let i = 0; i < g.length; i++) {
+    const c = g[i];
+    if (c === "*") re += ".*";
+    else if (c === "?") re += ".";
+    else if (c === "[") {
+      const j = g.indexOf("]", i + 2);
+      if (j < 0) { re += "\\["; continue; }
+      re += "[" + g.slice(i + 1, j).replace(/^!/, "^").replace(/\\/g, "\\\\") + "]";
+      i = j;
+    } else re += c.replace(/[.+^${}()|\\\]]/g, "\\$&");
+  }
+  return new RegExp("^" + re + "$");
+}
+function ageExempt(name, rule) {
+  const n = String(name);
+  return (rule.devel || []).some(s => n.endsWith(s)) || (rule.exclude || []).some(g => globRe(g).test(n));
+}
+// The AUR updates still too new, each with when it clears.
+// `rule` is Pac.paruAgeOf's; `ages` readAurAges'. → [{ name, until (ms) }]
+function heldOf(aur, rule, ages, now) {
+  if (!rule || !(rule.secs > 0) || !ages) return [];
+  const out = [];
+  for (const u of aur || []) {
+    const at = ages[u.name];
+    if (!at || ageExempt(u.name, rule)) continue;
+    const until = at + rule.secs * 1000;
+    if (until > now) out.push({ name: u.name, until: until });
+  }
+  return out;
+}
+// A full upgrade without them. Only paru's own -Syu is touched: setup's
+// pacman -Syu is the repos', where the age means nothing.
+// The very same list back when there is nothing to leave out of it.
+function withHeld(steps, names) {
+  const hit = a => a[0] === "-Syu" && a.indexOf("--ignore") < 0;
+  if (!(names || []).length || !(steps || []).some(hit)) return steps;
+  return steps.map(a => hit(a) ? a.concat(["--ignore", names.join(",")]) : a);
+}
+
+// 259200 → "3 days": the age as Settings and the job's label say it
+function ageWords(secs) {
+  const units = [[604800, "week"], [86400, "day"], [3600, "hour"], [60, "minute"], [1, "second"]];
+  for (const [n, w] of units)
+    if (secs >= n && secs % n === 0) { const k = secs / n; return k + " " + w + (k === 1 ? "" : "s"); }
+  return "0 seconds";
+}
+
+// paru.conf, the one paru reads: $PARU_CONF, then yours, then the system's.
+// The first line says which.
+function paruConfCommand() {
+  return "p=\"${PARU_CONF:-${XDG_CONFIG_HOME:-$HOME/.config}/paru/paru.conf}\"; "
+    + "[ -e \"$p\" ] || p=/etc/paru.conf; echo \"@@path $p\"; cat -- \"$p\" 2>/dev/null";
+}
+// → { path, lines }
+function readParuConf(text) {
+  const s = String(text ?? "");
+  const nl = s.indexOf("\n");
+  const head = nl < 0 ? s : s.slice(0, nl);
+  const m = /^@@path (.+)$/.exec(head);
+  if (!m) return { path: "", lines: [] };
+  const ls = (nl < 0 ? "" : s.slice(nl + 1)).split("\n");
+  if (ls.length && ls[ls.length - 1] === "") ls.pop();
+  return { path: m[1], lines: ls };
+}
+// Written beside it and renamed over it, the old one kept as .ceres-bak —
+// the system's as root, yours as you (no password for your own file).
+function paruConfSteps(path, text) {
+  const p = q(path), tmp = q(path + ".ceres-new"), bak = q(path + ".ceres-bak");
+  const write = "{ [ ! -e " + p + " ] || cp -p " + p + " " + bak + "; } && printf '%s' " + q(text) + " > " + tmp
+    + " && chmod 644 " + tmp + " && mv -f " + tmp + " " + p;
+  if (/^\/etc\//.test(path)) return [["@sudo", "sh", "-c", write]];
+  return [["@user", "mkdir -p " + q(path.replace(/\/[^/]*$/, "")) + " && " + write]];
+}
+
+// paru's refusal, when an install named something still too new — the age
+// is in paru.conf, and Ceres only leaves such updates out of a full one:
+//   error: the following AUR packages are newer than the minimum release age
+//   of 3 days: foo (updated 5 hours ago), bar (updated 1 day ago)
+// → { age: "3 days", packages: [{ name, ago }] } or null
+function ageRefusalOf(lines) {
+  for (const raw of lines || []) {
+    const m = /newer than the minimum release age of (.+?): (.+)$/.exec(String(raw).trim());
+    if (!m) continue;
+    const pkgs = [...m[2].matchAll(/(\S+) \(updated (.+?) ago\)/g)].map(x => ({ name: x[1], ago: x[2] }));
+    return { age: m[1], packages: pkgs };
+  }
+  return null;
+}
+// The failure, as a sentence: "foo changed on the AUR 5 hours ago, under
+// paru's 3 days" — what is new, and the rule it is held by.
+function ageRefusalLine(r) {
+  const ps = (r && r.packages) || [];
+  if (ps.length === 0) return "Held back by paru's minimum release age of " + ((r && r.age) || "?");
+  const one = p => p.name + " " + p.ago + " ago";
+  return (ps.length === 1 ? ps[0].name + " changed on the AUR " + ps[0].ago + " ago"
+    : "Changed on the AUR too recently: " + ps.map(one).join(", "))
+    + " \u2014 paru holds back AUR changes newer than " + r.age;
+}
+// The same steps, once past the age: --nominimumreleaseage on paru's own
+// -S steps, for this run only.
+function unheldSteps(steps) {
+  return (steps || []).map(a => /^-S/.test(a[0] || "") && a.indexOf("--nominimumreleaseage") < 0
+    ? [a[0], "--nominimumreleaseage"].concat(a.slice(1)) : a);
+}
+
 // Installing and removing in one go: install first, so a removal that the
 // install made unnecessary is still asked for, and a failed install does not
 // leave you having removed something on its way.

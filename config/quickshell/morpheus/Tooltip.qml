@@ -23,7 +23,11 @@ CursorAnchor {
   // ragged-right is what makes those scannable. A tooltip that is a couple of
   // short standalone lines reads better centered, and says so.
   property int align: Text.AlignLeft
-  // Zero or more sparklines under the text, each { values, line, fill }.
+  // Zero or more sparklines under the text, each { values, line, fill,
+  // peak, format } — the last two for the peak in the graph's corner: what
+  // it is read from (`values` when left out) and how it is written (a
+  // percentage when left out). Drawn in Sparkline's panel look, the one the
+  // jobs card wears too.
   // A list rather than one series plus a color pair: network has two
   // channels to plot, and a second set of history/historyLineColor/... would
   // have been a parallel way of saying the same thing.
@@ -70,9 +74,9 @@ CursorAnchor {
     Column {
       id: layout
       width: Math.max(content.implicitWidth,
-        sparks.visible ? sparks.implicitWidth + 40 : content.implicitWidth)
+        sparks.visible ? sparks.implicitWidth + 32 : content.implicitWidth)
       height: content.implicitHeight
-        + (sparks.visible ? sparks.implicitHeight + 10 + 6 : 0)
+        + (sparks.visible ? sparks.implicitHeight + 12 : 0)
       spacing: 0
 
       Text {
@@ -97,7 +101,7 @@ CursorAnchor {
         id: sparks
         visible: popup.liveSeries.length > 0
         anchors.horizontalCenter: parent.horizontalCenter
-        spacing: 4
+        spacing: 6
 
         // Modeled on the COUNT, not on the list itself. The list is rebuilt
         // every time its data changes — four times a second for network — and
@@ -110,9 +114,12 @@ CursorAnchor {
           delegate: Sparkline {
             required property int index
             readonly property var cfg: popup.liveSeries[index] ?? null
-            width: Math.max(160, content.implicitWidth - 20)
-            height: 32
+            width: Math.max(200, content.implicitWidth - 32)
+            height: 64
+            panel: true
             values: cfg ? cfg.values : []
+            peakValues: cfg ? (cfg.peak ?? cfg.values) : []
+            peakFormat: cfg && cfg.format ? cfg.format : (v) => Math.round(v) + "%"
             lineColor: cfg ? cfg.line : Zenon.cyan
             // most callers want the fill to be the line's own color
             fillColor: cfg ? (cfg.fill ?? cfg.line) : Zenon.cyan
@@ -121,7 +128,7 @@ CursorAnchor {
         }
       }
 
-      Item { width: 1; height: sparks.visible ? 10 : 0 }
+      Item { width: 1; height: sparks.visible ? 12 : 0 }
     }
   }
 }

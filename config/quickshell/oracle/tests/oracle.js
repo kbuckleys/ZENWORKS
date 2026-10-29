@@ -270,22 +270,67 @@ module.exports = {
         if (/within: "/.test(m[3])) continue;
         (bySection[m[2]] = bySection[m[2]] || []).push(m[1]);
       }
-      for (const page of ["notify", "bar", "menu", "idle", "windows", "time", "motion", "surfaces"]) {
+      for (const page of ["notify", "bar", "menu", "idle", "windows", "time", "datetime", "motion", "surfaces",
+                         "tiling", "workspaces", "wineffects"]) {
         const listed = [].concat(...T.pageLayout(page).map((p) => p[1]));
         t.eq(page + ": each setting listed once", listed.length, new Set(listed).size);
         t.eq(page + ": every setting of the page is under a heading",
           (bySection[page] || []).filter((k) => listed.indexOf(k) < 0).join(", "), "");
         // an input setting shown here too (its alsoIn) is made from
-        // oracle.js, not Oracle.qml: named "input:<field>"
+        // oracle.js, not Oracle.qml: named "input:<field>"; the time
+        // zone's rows are made from zone.tab: "tz:<field>"
         t.eq(page + ": nothing listed that the page lacks",
-          listed.filter((k) => (bySection[page] || []).indexOf(k) < 0 && !/^input:/.test(k)).join(", "), "");
+          listed.filter((k) => (bySection[page] || []).indexOf(k) < 0 && !/^(input|tz|hl):/.test(k)).join(", "), "");
       }
-      const rows = T.filterSchema([{ key: "b", section: "time" }, { key: "clock24h", section: "time" },
+      // hyprland's rows (HYPR_FIELDS): each in a part its page names, once
+      t.eq("every hyprland row's part is on its page", T.hyprPlace(JSON.parse(JSON.stringify(T.pageLayout ? {
+        windows: T.pageLayout("windows"), tiling: T.pageLayout("tiling"), workspaces: T.pageLayout("workspaces"),
+        wineffects: T.pageLayout("wineffects"), motion: T.pageLayout("motion") } : {}))).join(", "), "");
+      for (const f of T.hyprFields()) {
+        const page = T.pageLayout(f.section);
+        if (!page) continue;
+        const n = [].concat(...page.map((p) => p[1])).filter((k) => k === "hl:" + f.key).length;
+        if (n !== 1) t.eq("hl:" + f.key + " listed once", n, 1);
+      }
+      const rows = T.filterSchema([{ key: "b", section: "time" }, { key: "calRemindLead", section: "time" },
                                    { key: "weatherEnabled", section: "time" }], "time", "");
-      t.eq("laid out in the page's order", rows.map((r) => r.key).join(","), "clock24h,weatherEnabled,b");
-      t.eq("the first of a part carries its heading", rows[0].head + "/" + rows[1].head, "Clock/Weather");
+      t.eq("laid out in the page's order", rows.map((r) => r.key).join(","), "weatherEnabled,calRemindLead,b");
+      t.eq("the first of a part carries its heading", rows[0].head + "/" + rows[1].head, "Weather/Calendar");
       t.eq("a search lists no headings",
-        T.filterSchema([{ key: "clock24h", section: "time", label: "24-hour clock" }], "time", "clock")[0].head, undefined);
+        T.filterSchema([{ key: "weatherEnabled", section: "time", label: "Fetch the forecast" }], "time", "forecast")[0].head, undefined);
+    }
+
+    // ── date & time ──
+    {
+      t.eq("zone.tab coordinates", T.parseIso6709("+3003+03115"), { lat: 30.05, lon: 31.25 });
+      t.eq("with seconds, south and west", T.parseIso6709("-345600-0582200").lat.toFixed(3), "-34.933");
+      t.eq("not a coordinate", T.parseIso6709("x"), null);
+      t.eq("a city as said", T.zoneCity("America/Argentina/Buenos_Aires"), "Buenos Aires (Argentina)");
+      const tab = "# c\nEG\t+3003+03115\tAfrica/Cairo\nGB\t+513030-0000731\tEurope/London\n"
+        + "JE\t+491101-0020624\tEurope/London\nUS\t+404251-0740023\tAmerica/New_York\tEastern\n";
+      const zs = T.parseZoneTab(tab);
+      t.eq("one row a zone, by region", zs.map((z) => z.zone).join(","), "Africa/Cairo,America/New_York,Europe/London");
+      t.eq("regions, and the one worn", T.zoneRegionOptions(zs, "UTC").map((o) => o.value).join(","), "Africa,America,Europe,Other");
+      t.eq("a region's cities", T.zoneCityOptions(zs, "Europe", "Europe/Jersey").map((o) => o.label).join(","), "Jersey,London");
+      t.eq("nearest city", T.nearestZone(zs, 48.9, 2.3).zone, "Europe/London");
+      t.eq("across the date line too", T.nearestZone(zs, 40, -80).zone, "America/New_York");
+      const td = T.parseTimedate("Timezone=Africa/Cairo\nLocalRTC=no\nCanNTP=yes\nNTP=yes\nNTPSynchronized=no\nTimeUSec=Thu 2026-10-29 19:29:34 EEST\n");
+      t.eq("timedatectl read", [td.zone, td.ntp, td.canNtp, td.synced, td.localRtc, td.abbrev].join(","),
+        "Africa/Cairo,true,true,false,false,EEST");
+      t.eq("an offset", T.utcOffsetText(330) + " " + T.utcOffsetText(-240) + " " + T.utcOffsetText(0), "UTC+5:30 UTC\u22124 UTC");
+      // the March 2026 equinox (20th, 14:46 UTC): the sun on the equator
+      const eq = T.subsolar(Date.UTC(2026, 2, 20, 14, 46));
+      t.ok("equinox: over the equator", Math.abs(eq.lat) < 0.3);
+      // noon at Greenwich is within the equation of time of 0° (±4.5°)
+      t.ok("equinox: noon at Greenwich", Math.abs(T.subsolar(Date.UTC(2026, 2, 20, 12, 0)).lon) < 4.5);
+      t.ok("June solstice: the tropic of Cancer", Math.abs(T.subsolar(Date.UTC(2026, 5, 21, 8, 24)).lat - 23.44) < 0.1);
+      const sun = { lat: 0, lon: 0 };
+      t.eq("at the sun's meridian, all day", T.daySpans(0, sun, 0), [[-90, 90]]);
+      t.eq("opposite it, all night", T.daySpans(180, sun, 0).length, 0);
+      t.eq("midnight's twilight lies at the poles", T.daySpans(180, sun, -6).length, 2);
+      const jun = { lat: 23.44, lon: 0 };
+      const sp = T.daySpans(180, jun, 0);
+      t.ok("June midnight: the Arctic still lit", sp.length === 1 && sp[0][1] === 90 && Math.abs(sp[0][0] - 66.56) < 0.01);
     }
 
     // ...but it is told apart from a file that was fine, so it is kept

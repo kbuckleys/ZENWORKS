@@ -482,6 +482,55 @@ Item {
             onClicked: view.buildParu()
           }
 
+          // ── how long a new AUR change waits ─────────────────────────
+          // paru 2.2.0's MinimumReleaseAge: an AUR package changed more
+          // recently is not installed or upgraded, which gives the AUR's
+          // people time to catch a bad change before it reaches you. A full
+          // upgrade leaves such updates out (Cer.heldOf) instead of failing
+          // on them. Saved straight to paru.conf, as its own job.
+          Item { width: 1; height: 4 }
+          Text {
+            text: "Wait before new AUR changes"
+            color: Zenon.accentMuted
+            font.family: Zenon.face
+            font.weight: Font.Bold
+            font.pixelSize: Zenon.px(15)
+          }
+          Segments {
+            id: ageSegs
+            readonly property var presets: [["", "Off", "as soon as they change"], ["1d", "1 day", ""],
+                                            ["3d", "3 days", "paru's example"], ["1w", "1 week", ""]]
+            // whichever preset says the same length; a value set by hand
+            // shows as one more choice of its own
+            readonly property string here: {
+              const secs = Ceres.ageRule.secs;
+              const hit = ageSegs.presets.find(o => Pac.releaseAge(o[0]) === secs);
+              return hit ? hit[0] : Ceres.ageRule.raw;
+            }
+            width: parent.width
+            even: true
+            strong: true
+            textSize: Zenon.px(16)
+            ink: Zenon.accentKey
+            options: ageSegs.presets.some(o => o[0] === ageSegs.here) ? ageSegs.presets
+              : ageSegs.presets.concat([[ageSegs.here, Cer.ageWords(Ceres.ageRule.secs), "set by hand"]])
+            current: ageSegs.here
+            allowed: Ceres.txBusy || !Ceres.paruConf.path ? [ageSegs.here] : null
+            onChose: (v) => { if (v !== ageSegs.here) Ceres.setParuAge(v); view.released(); }
+          }
+          Text {
+            width: parent.width
+            wrapMode: Text.Wrap
+            text: "AUR packages changed more recently than this are not installed or updated yet, so a bad change has time to be caught. "
+              + "Update all leaves them out and brings them in once they are old enough. Development packages (-git and the like) "
+              + (Ceres.ageRule.exclude.length ? "and " + Ceres.ageRule.exclude.join(", ") + " " : "")
+              + "never wait." + (Ceres.paruConf.path ? " Kept in " + Ceres.paruConf.path + "." : "")
+            color: Zenon.accentKey
+            font.family: Zenon.face
+            font.weight: Zenon.weight
+            font.pixelSize: Zenon.px(15)
+          }
+
           // ── channels: Flathub ──────────────────────────────────────
           // Added later, or taken away, as setup's question was answered
           // (user, 2026-10-14). Taking it away asks in a sheet first,

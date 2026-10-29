@@ -4,12 +4,13 @@
 // https://github.com/kbuckleys/
 //
 // The list of jobs, as a card: every copy, move, archive and extract at once,
-// live, each with its own meter and its own way to stop. Drawn from Jobs, so
-// the terminus drawer and the bar's panel are the same card showing the same
-// rows. It was terminus' own drawer until the jobs moved here — see Jobs.qml.
+// live, each with its own speed graph and its own way to stop.
+// Drawn from Jobs, so the terminus drawer and the bar's panel are the same
+// card showing the same rows. It was terminus' own drawer until the jobs moved here — see Jobs.qml.
 
 import QtQuick
 import "."
+import "helpers.js" as Helpers
 
 Rectangle {
   id: jobsCard
@@ -100,12 +101,29 @@ Rectangle {
         id: jobRow
         required property var model
         width: jobsCol.width
-        height: 50
+        height: 106
 
         readonly property bool ended: jobRow.model.state !== "running"
         readonly property color ink: jobRow.model.state === "failed"
           ? Zenon.red
           : (jobRow.ended || jobRow.model.cancelled ? Zenon.muted : Zenon.white)
+        // What the graph is drawn in: cyan while it runs, then the way it
+        // ended.
+        readonly property color accent: jobRow.model.state === "failed" ? Zenon.red
+          : jobRow.model.state === "done" ? Zenon.green
+          : (jobRow.ended || jobRow.model.cancelled ? Zenon.muted : Zenon.cyan)
+
+        // ── A SPEED GRAPH, NOT A METER ───────────────────────────────
+        // The percentage is already in words beside the ×; what a meter
+        // could not show is whether a job has stalled or is crawling over a
+        // pile of small files. Jobs keeps each one's speed (bytes a second,
+        // or entries a second for an archive or an extract) and this draws
+        // it in the bar tooltips' Sparkline panel, so a speed over time
+        // looks the same on a job as on the network (user, 2026-10-29:
+        // graph only, no progress bar).
+        readonly property bool counts: jobRow.model.op === "archive"
+          || jobRow.model.op === "extract"
+        readonly property var speed: jobsCard.jobs.speeds[jobRow.model.id] || []
 
         // icarus' menu highlight, which the context menu and its submenu
         // already wear. A drawer that lit its rows a different color
@@ -281,68 +299,24 @@ Rectangle {
           }
         }
 
-        // A METER, NOT A BAR. The same instrument the zoom control
-        // and the audio quick look already are, so a proportion in this
-        // window is read the same way wherever it turns up.
-        Meter {
-          id: jobBar
+        Sparkline {
           anchors.left: parent.left
           anchors.right: parent.right
           anchors.bottom: parent.bottom
           anchors.leftMargin: 12
           anchors.rightMargin: 12
-          anchors.bottomMargin: 9
-          vertical: false
-          thickness: 6
-          segLength: 6
-          segGap: 3
-          // Every segment counts. A dead zone is for a control you set
-          // by hand and nudge off its floor; this is a readout.
-          deadZone: 0
-          // From the PARENT's width, not this item's own. segCount
-          // feeds implicitWidth inside Meter, so measuring `width`
-          // here would be a size that depends on itself.
-          segCount: Math.max(10, Math.floor((parent.width - 24) / 9))
-
-          // NOT EVERY JOB CAN SAY HOW FAR ALONG IT IS.
-          //
-          // The percentage is counted out of entries, and an archive of
-          // ONE file has exactly one entry: it sits at 0 for the whole
-          // run and then jumps to 100 as it exits. An empty meter for
-          // twenty seconds is indistinguishable from one that does not
-          // work — which is what it was taken for.
-          //
-          // So a job with nothing to report says so by MOVING: the fill
-          // sweeps the segments end to end, which is what every
-          // progress readout that cannot count does. The moment a real
-          // percentage arrives the sweep stops and the count takes over.
-          readonly property bool counting: jobRow.ended
-            || jobRow.model.pct > 0 || jobRow.model.entries > 1
-            || jobRow.model.index > 0
-
-          property real chase: 0
-          NumberAnimation on chase {
-            running: !jobBar.counting && !jobRow.model.cancelled
-            loops: Animation.Infinite
-            from: 0; to: 1
-            duration: Zenon.sweep
-            easing.type: Easing.InOutQuad
-          }
-
-          value: jobBar.counting || jobRow.model.cancelled
-            ? jobRow.model.pct / 100 : jobBar.chase
-          accent: jobRow.model.state === "failed" ? Zenon.red
-            : jobRow.model.state === "done" ? Zenon.green
-            : (jobRow.ended || jobRow.model.cancelled ? Zenon.muted
-                                                      : Zenon.cyan)
-          // The row is edited in place rather than rebuilt — see the
-          // note on jobsCard.jobs.model — which is what lets this animate at all.
-          // Off while sweeping: the chase is already an animation, and
-          // easing it a second time turns it to soup.
-          Behavior on value {
-            enabled: jobBar.counting
-            NumberAnimation { duration: Zenon.ms(300); easing.type: Zenon.ease }
-          }
+          anchors.bottomMargin: 10
+          height: 64
+          panel: true
+          scaleToPeak: true
+          // a minute of it, at Jobs' 1Hz
+          maxPoints: 60
+          values: jobRow.speed
+          peakFormat: jobRow.counts
+            ? (v) => (v >= 10 ? Math.round(v) : v.toFixed(1)) + " entries/s"
+            : Helpers.powFormat
+          lineColor: jobRow.accent
+          fillColor: jobRow.accent
         }
       }
     }

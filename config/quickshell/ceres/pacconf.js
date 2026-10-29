@@ -455,3 +455,37 @@ function readReviewOut(out) {
   const problems = m[1].split("\n").filter(l => l.trim() !== "" && was.indexOf(problemKey(l)) < 0);
   return { diff: diff, ok: m[2] === "0" && problems.length === 0, problems: problems };
 }
+
+// ── PARU.CONF: THE MINIMUM RELEASE AGE ────────────────────────────────────
+// paru.conf is pacman.conf's shape — [options], "Key = value", flags bare —
+// so it is edited by the same hand: the one line changed, the rest kept.
+// Only MinimumReleaseAge (paru 2.2.0) is set from Ceres; the exclusions and
+// DevelSuffixes are read, since they decide what the age spares.
+//
+// paru's own defaults for DevelSuffixes, when paru.conf names none.
+const PARU_DEVEL = ["-git", "-cvs", "-svn", "-bzr", "-darcs", "-always", "-hg", "-fossil"];
+
+// paru's parse_release_age: a whole number with s, m, h, d or w after it, a
+// bare number being days. → seconds; 0 for unset or a value paru refuses.
+function releaseAge(s) {
+  const m = /^\s*(\d+)\s*([smhdw]?)\s*$/.exec(String(s ?? ""));
+  if (!m) return 0;
+  const unit = { s: 1, m: 60, h: 3600, d: 86400, w: 604800 }[m[2] || "d"];
+  return Number(m[1]) * unit;
+}
+
+// → { raw, secs, exclude: [globs], devel: [suffixes] }
+function paruAgeOf(ls) {
+  const raw = getOption(ls, "MinimumReleaseAge").value;
+  const words = key => String(getOption(ls, key).value || "").split(/\s+/).filter(w => w !== "");
+  const devel = words("DevelSuffixes");
+  return { raw: String(raw || ""), secs: releaseAge(raw), exclude: words("MinimumReleaseAgeExclude"),
+           devel: devel.length ? devel : PARU_DEVEL };
+}
+
+// "" (or null) unsets: the line commented out, as setOption does. A file
+// with no [options] at all gains one.
+function setParuAge(ls, value) {
+  if (!optionsSection(ls)) return value ? ["[options]", "MinimumReleaseAge = " + value].concat(ls) : ls;
+  return setOption(ls, "MinimumReleaseAge", value || "");
+}

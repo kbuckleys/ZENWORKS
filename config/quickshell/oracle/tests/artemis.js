@@ -15,25 +15,28 @@ module.exports = {
   module: "artemis/artemis.js",
   cases: (A, t) => {
     // ── unscoped: artemis' own search, unchanged ──────────────────────────
-    t.eq("filter reads the whole index",
-      A.filterCommand("/c/idx", "foo", false),
-      "cat '/c/idx' 2>/dev/null | fzf --filter 'foo' 2>/dev/null | head -n 500");
+    // since 0.1.8 a search is passes in a capture, r=$(…): the names first,
+    // in whole words and any case, then the paths, then fuzzy
+    const all = A.filterCommand("/c/idx", "foo", false);
+    t.eq("filter reads the whole index", all.indexOf("r=$(cat '/c/idx' 2>/dev/null | ") === 0, true);
+    t.has("names first, whole words, any case", all, "fzf --filter 'foo' -i -e -d '\\t' --nth 1");
+    t.has("fuzzy last, and at most 500", all, "fzf --filter 'foo' -i  -d '\\t' --nth 1 2>/dev/null | cut -f2- | head -n 500");
     t.eq("dirs-only reads the directories",
-      A.filterCommand("/c/idx", "foo", true).indexOf("grep '/$' '/c/idx'") === 0, true);
+      A.filterCommand("/c/idx", "foo", true).indexOf("r=$(grep '/$' '/c/idx'") === 0, true);
     t.eq("browse is the head of the index",
       A.browseCommand("/c/idx", false), "cat '/c/idx' 2>/dev/null | head -n 200");
 
     // ── scoped: plato's project search ────────────────────────────────────
     const f = A.filterCommand("/c/idx", "view", false, "/home/test/proj");
     t.eq("a scope reads only files under it, relative",
-      f.indexOf("awk -v r='/home/test/proj/' 'index($0, r) == 1") === 0, true);
+      f.indexOf("r=$(awk -v r='/home/test/proj/' 'index($0, r) == 1") === 0, true);
     t.eq("a scope drops directories", f.indexOf("substr($0, length($0)) != \"/\"") > 0, true);
     t.eq("and ranks what is left the same way", / \| fzf --filter 'view' /.test(f), true);
     t.eq("a scope with a quote in it stays one word",
       A.filterCommand("/c/idx", "x", false, "/home/test/o'dd").indexOf("'/home/test/o'\\''dd/'") > 0, true);
 
     t.eq("the whole index's files, for plato's finder",
-      A.filterCommand("/c/idx", "x", false, "files").indexOf("grep -v '/$' '/c/idx'") === 0, true);
+      A.filterCommand("/c/idx", "x", false, "files").indexOf("r=$(grep -v '/$' '/c/idx'") === 0, true);
 
     // ── covers ────────────────────────────────────────────────────────────
     t.eq("home covers a project in it", A.covers("/home/test", "/home/test/.config/quickshell"), true);

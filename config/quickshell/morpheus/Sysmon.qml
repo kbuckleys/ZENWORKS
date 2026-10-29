@@ -47,6 +47,15 @@ Singleton {
     while (h.length > root.span) h.shift();
     return h;
   }
+  // The same, unclamped: a raw reading (bytes a second) kept beside its
+  // 0..100 level, for a graph that writes its peak as a speed — the network
+  // tooltip's, and each job's in Jobs.
+  function pushRaw(list, v) {
+    const h = list.slice();
+    h.push(Math.max(0, v));
+    while (h.length > root.span) h.shift();
+    return h;
+  }
 
   // ── cpu ───────────────────────────────────────────────────────────────
   readonly property color cpuInk: Zenon.red
@@ -577,6 +586,10 @@ Singleton {
   property string netUpText: "0.0B/s"
   property var netDownHistory: []
   property var netUpHistory: []
+  // the same samples in bytes a second, which the log-scaled levels above
+  // cannot be read back into
+  property var netDownRaw: []
+  property var netUpRaw: []
   property var netSample: null
   // The interface's own counters: everything received and sent since it came
   // up, which is since boot for anything that stays plugged in.
@@ -711,6 +724,8 @@ Singleton {
         root.netUpText = Helpers.powFormat(root.netUp);
         root.netDownHistory = root.push(root.netDownHistory, root.netDownLevel);
         root.netUpHistory = root.push(root.netUpHistory, root.netUpLevel);
+        root.netDownRaw = root.pushRaw(root.netDownRaw, root.netDown);
+        root.netUpRaw = root.pushRaw(root.netUpRaw, root.netUp);
       }
     }
     root.netSample = { rx: rx, tx: tx, time: now };

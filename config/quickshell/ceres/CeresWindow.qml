@@ -2001,6 +2001,8 @@ FloatingWindow {
         else if (k === Qt.Key_T && Ceres.txState === "failed") { event.accepted = true; Ceres.txInTerminal(); }
         // paru's unasked question, answered here — see TxView.settle
         else if (k === Qt.Key_Y && txView.settleable) { event.accepted = true; txView.settle(); }
+        // past paru's minimum release age, this once — Ceres.txUnheldRun
+        else if (k === Qt.Key_Y && Ceres.txUnholdable) { event.accepted = true; Ceres.txUnheldRun(); }
         else if ((k === Qt.Key_Left || k === Qt.Key_Right) && txView.settling) {
           event.accepted = true;
           txView.pickNext(k === Qt.Key_Left ? -1 : 1);
@@ -3747,6 +3749,7 @@ FloatingWindow {
                 anchors.rightMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
                 u: urow.modelData.head ? null : urow.modelData.u
+                pending: !!urow.modelData.aur
               }
               TapHandler {
                 enabled: !urow.modelData.head
@@ -4138,6 +4141,7 @@ FloatingWindow {
         return (txView.settleInfo.providers.length ? [["\u2190 \u2192", "provider"]] : [])
           .concat([["y", txView.settleInfo.conflicts.length ? "replace and install" : "install"],
                    ["t", "open in terminal"], ["return", "back"]]);
+      if (Ceres.txUnholdable) return [["y", "install anyway"], ["t", "open in terminal"], ["return", "back"]];
       return Ceres.txState === "failed"
         ? [["t", "open in terminal"], ["return", "back"]]
         : [["return", "back"]];
@@ -4227,6 +4231,13 @@ FloatingWindow {
       ink: Zenon.cyan
       primary: true
       onClicked: txView.settle()
+    }
+    DialogButton {
+      visible: win.face === "tx" && Ceres.txUnholdable
+      label: "Install anyway"
+      ink: Zenon.cyan
+      primary: true
+      onClicked: Ceres.txUnheldRun()
     }
     DialogButton {
       visible: win.face === "tx" && Ceres.txState === "failed"

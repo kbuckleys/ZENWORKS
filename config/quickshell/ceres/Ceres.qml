@@ -34,6 +34,7 @@ import Quickshell.Io
 import "../oracle"
 import "../morpheus"
 import "ceres.js" as Cer
+import "pacconf.js" as Pac
 
 Singleton {
   id: root
@@ -176,7 +177,7 @@ Singleton {
   signal setupRequested()
   property bool _checkAfterSetup: false
 
-  function checkDeps() { depsProc.running = true; }
+  function checkDeps() { depsProc.running = true; paruConfProc.running = true; }
   Process {
     id: depsProc
     command: ["sh", "-c", Cer.depsCommand()]
@@ -184,6 +185,54 @@ Singleton {
       id: depsOut
       onStreamFinished: { root.deps = Cer.readDeps(depsOut.text); root.listFlatpaks(); }
     }
+  }
+
+  // ── HELD BACK: paru's MinimumReleaseAge (paru 2.2.0) ──────────────────
+  // See Cer.heldOf. paru.conf is read with the deps (at start and after
+  // every job, so a change made here or by hand shows); the AUR is asked
+  // when each update last changed only while an age is set.
+  property var paruConf: ({ path: "", lines: [] })
+  readonly property var ageRule: Pac.paruAgeOf(root.paruConf.lines)
+  property var aurAges: null
+  property real ageNow: Date.now()
+  readonly property var held: Cer.heldOf(root.aur, root.ageRule, root.aurAges, root.ageNow)
+  readonly property var heldNames: root.held.map(h => h.name)
+  // name → when it clears, for the rows
+  readonly property var heldUntil: { const o = {}; for (const h of root.held) o[h.name] = h.until; return o; }
+  onAgeRuleChanged: root.askAges()
+  function askAges() {
+    root.ageNow = Date.now();
+    if (!(root.ageRule.secs > 0) || root.aur.length === 0) { root.aurAges = null; return; }
+    agesProc.running = false;
+    agesProc.command = ["sh", "-c", Cer.aurAgesCommand(root.aur.map(u => u.name))];
+    agesProc.running = true;
+  }
+  Process {
+    id: agesProc
+    stdout: StdioCollector {
+      id: agesOut
+      // the AUR not answering keeps what it said last: an update it marked
+      // still too new is not let through for a dropped request
+      onStreamFinished: { const a = Cer.readAurAges(agesOut.text); if (a) root.aurAges = a; root.ageNow = Date.now(); }
+    }
+  }
+  Process {
+    id: paruConfProc
+    command: ["sh", "-c", Cer.paruConfCommand()]
+    stdout: StdioCollector {
+      id: paruConfOut
+      onStreamFinished: root.paruConf = Cer.readParuConf(paruConfOut.text)
+    }
+  }
+  // Settings › Channels: "" turns it off. A job of its own, like the other
+  // channel changes — the system's paru.conf as root, yours as you.
+  function setParuAge(value) {
+    if (!root.paruConf.path) return false;
+    const now = Pac.setParuAge(root.paruConf.lines, value);
+    if (Pac.text(now) === Pac.text(root.paruConf.lines)) return false;
+    return root.request(Cer.paruConfSteps(root.paruConf.path, Pac.text(now)),
+      value ? "hold back new AUR changes for " + Cer.ageWords(Pac.releaseAge(value))
+            : "stop holding back new AUR changes", 0);
   }
 
   // `paru` is "paru", "paru-git" or "" when paru is already here.
@@ -458,7 +507,7 @@ Singleton {
     // Each half that answered is believed, whatever the other did: a mirror
     // being down says nothing about the AUR.
     if (r && r.ok) root.repo = r.list;
-    if (a && a.ok) root.aur = a.list;
+    if (a && a.ok) { root.aur = a.list; root.askAges(); }
     // Flatpak's answer is believed when it came; its failing is not the
     // check failing — the system's two halves decide that
     const f = root._flatOut;
@@ -822,10 +871,13 @@ Singleton {
 
   function upgradeAll(password, noAuth) {
     if (root.txBusy || (!password && !noAuth)) return;
-    root.txSteps = root.nextSteps;
+    // a full upgrade leaves out what paru's minimum age would refuse it for
+    root.txSteps = Cer.withHeld(root.nextSteps, root.heldNames);
+    const heldOut = root.txSteps !== root.nextSteps ? root.heldNames.length : 0;
     root.txLabel = root.nextLabel;
     root.txFlat = root.nextFlat;
     root.txSettle = null;
+    root.txAgeRefusal = null;
     root.txState = "auth";
     root.txPhase = "Authenticating";
     root.txLog = [];
@@ -837,7 +889,8 @@ Singleton {
     root.txCancelling = false;
     root.txStartedAt = Date.now();
     // pacman.log hears of the system's updates only — never Flatpak's
-    root.txExpected = root.nextExpected >= 0 ? root.nextExpected : root.repo.length + root.aur.length;
+    root.txExpected = root.nextExpected >= 0 ? Math.max(0, root.nextExpected - heldOut)
+      : root.repo.length + root.aur.length - heldOut;
     root._trying = password;
     root._sizesBefore = null;
     root.measureSizes(false);
@@ -874,6 +927,15 @@ Singleton {
   // The failed steps again, with what txSettle asked now answered: the
   // provider picked in `choices` ({ menu name: option }) and every listed
   // conflict agreed to (Cer.settledSteps).
+  // paru refused an install for the minimum release age (Cer.ageRefusalOf):
+  // the same steps again, past it for this run only.
+  property var txAgeRefusal: null
+  // what the window and the panel offer: "Install anyway", key y
+  readonly property bool txUnholdable: root.txState === "failed" && !!root.txAgeRefusal && !root.txSettle
+  function txUnheldRun() {
+    if (root.txBusy || !root.txAgeRefusal) return false;
+    return root.request(Cer.unheldSteps(root.txSteps), root.txLabel, root.txExpected);
+  }
   function txSettleRun(choices) {
     if (root.txBusy || !root.txSettle) return;
     root.request(Cer.settledSteps(root.txSteps, root.txSettle, choices), "", root.txExpected);
@@ -1021,6 +1083,8 @@ Singleton {
         : code === 0 ? "" : (Cer.failureOf(root.txLog)
           || "paru stopped (exit " + code + ")");
       root.txSettle = !cancelled && code !== 0 ? Cer.settleOf(root.txLog) : null;
+      root.txAgeRefusal = !cancelled && code !== 0 ? Cer.ageRefusalOf(root.txLog) : null;
+      if (root.txAgeRefusal) root.txError = Cer.ageRefusalLine(root.txAgeRefusal);
       root.txState = cancelled || code !== 0 ? "failed" : "done";
       root.checkDeps();
       // every job, not only pacman's: restarting stale services takes no

@@ -997,7 +997,9 @@ module.exports = {
 
     {
       const r = T.parseRate("     32,768,000  45%   31.25MB/s    0:00:12 (xfr#1, to-chk=0/1)");
-      t.eq("rsync's speed and time left", r, { rate: "31.3 MB/s", eta: "0:12" });
+      t.eq("rsync's speed and time left", r, { rate: "31.3 MB/s", eta: "0:12", bps: 31250000 });
+      t.eq("the speed as a number, in the units it was written in",
+        T.parseRate(" 1,000  1%  512.00kB/s  1:02:03").bps, 512000);
       t.eq("hours kept when there are some",
         T.parseRate(" 1,000  1%  512.00kB/s  1:02:03").eta, "1:02:03");
       t.eq("a line with neither", T.parseRate("sending incremental file list"), null);

@@ -113,7 +113,58 @@ JobsBase {
     const pct = Terminus.parseProgress(text);
     if (pct < 0) return;
     const r = Terminus.parseRate(text);
+    if (r && jobs.meta[id]) { jobs.meta[id].bps = r.bps; jobs.meta[id].at = Date.now(); }
     jobs.update(id, r ? { pct: pct, rate: r.rate, eta: r.eta } : { pct: pct });
+  }
+
+  // ── HOW FAST, AS A GRAPH ──────────────────────────────────────────────
+  // Each job's speed over time, by id, for the row's Sparkline in JobsCard —
+  // the bar's performance tooltips' graph, in the same panel look, kept with
+  // the same backend (Sysmon.pushRaw: Sysmon.span samples, trimmed from the
+  // front). Raw figures, not levels: the card draws each against its own
+  // peak, so the top of the well is "as fast as this job has gone" and the
+  // peak in its corner is a real speed — a USB stick and an NVMe both use
+  // the whole height.
+  //
+  // What moves bytes (copy, move, download) is graphed in bytes a second,
+  // from rsync's own figure; an archive or an extract, which says no speed,
+  // in entries a second, counted from its progress. Every job has a graph,
+  // so the card needs no meter beside it.
+  //
+  // Sampled on a 1Hz clock rather than per progress line: the tools print
+  // when they like, and a Sparkline spaces its points evenly. A job whose
+  // rsync has gone quiet reads 0, not its last speed. Rows that have gone
+  // keep no history: the map is rebuilt from the model.
+  property var speeds: ({})
+  readonly property Timer speedClock: Timer {
+    interval: 1000
+    repeat: true
+    running: jobs.live > 0
+    onTriggered: jobs.sampleSpeeds()
+  }
+  function sampleSpeeds() {
+    const out = {};
+    const now = Date.now();
+    for (let i = 0; i < jobs.model.count; ++i) {
+      const row = jobs.model.get(i);
+      const had = jobs.speeds[row.id];
+      const m = jobs.meta[row.id];
+      if (row.state === "running" && !row.cancelled && m) {
+        let v = 0;
+        if (row.op === "archive" || row.op === "extract") {
+          const dt = (now - (m.seenAt || m.started)) / 1000;
+          v = dt > 0 ? Math.max(0, row.seen - (m.lastSeen || 0)) / dt : 0;
+          m.lastSeen = row.seen;
+          m.seenAt = now;
+        } else if (m.bps !== undefined && now - m.at <= 2000) {
+          v = m.bps;
+        }
+        out[row.id] = Sysmon.pushRaw(had || [], v);
+      } else if (had) {
+        out[row.id] = had;
+      }
+    }
+    jobs.speeds = out;
   }
 
   // Kill the job's whole process group — the reason it runs under setsid.

@@ -506,6 +506,9 @@ FloatingWindow {
   readonly property int arrangeH: 240
   // Surfaces' sample (SurfaceSample)
   readonly property int sampleH: 150
+  // Time & date's map (WorldMap): one height whatever the window's width —
+  // the world wraps round instead (user, 2026-10-29: no stretching)
+  readonly property int mapH: 380
   // ── CONTROLS HANG OFF THE RIGHT EDGE ──────────────────────────────────
   // Every control ENDS at the same x, hard against the scrollbar, and each
   // one takes only the width it actually needs. Two things follow from that,
@@ -707,6 +710,8 @@ FloatingWindow {
     if (id === "defaults") Oracle.scanApps();
     // and the input devices, so the headers say what is plugged in now
     if (id === "input") Oracle.scanInputDevices();
+    // and the clock, in case the zone was changed elsewhere
+    if (id === "datetime") Oracle.readTimedate();
     popup.editingKey = "";
     popup.closeEnumMenu();
     Qt.callLater(popup.toTop);
@@ -1088,7 +1093,8 @@ FloatingWindow {
         }
         // layout: the windows, a pixel apart
         Repeater {
-          model: art.kind !== "layout" ? []
+          // "" is a workspace's "same as Tiling": an empty screen
+          model: art.kind !== "layout" || art.value === "" ? []
             : art.value === "master" ? [[0, 0, 12, 12], [13, 0, 9, 3.67], [13, 4.17, 9, 3.67], [13, 8.33, 9, 3.67]]
             : art.value === "scrolling" ? [[-5, 0, 8, 12], [4, 0, 14, 12], [19, 0, 8, 12]]
             : [[0, 0, 10.5, 12], [11.5, 0, 10.5, 5.5], [11.5, 6.5, 4.75, 5.5], [17.25, 6.5, 4.75, 5.5]]
@@ -2490,7 +2496,8 @@ FloatingWindow {
                 // a setting's own row, not a frame's, a group's head or the desk
                 readonly property bool plain: !settingRow.arrange && !settingRow.inGroup && !settingRow.groupHead
                 height: settingRow.tucked ? 0
-                  : settingRow.arrange ? (settingRow.sampleRow ? popup.sampleH + settingRow.headH : popup.arrangeH)
+                  : settingRow.arrange ? (settingRow.mapRow ? popup.mapH - settingRow.mapLift + settingRow.headH
+                    : settingRow.sampleRow ? popup.sampleH + settingRow.headH : popup.arrangeH)
                   : rowHead.y + rowHead.height + settingRow.frameBelow
                     + (settingRow.open ? foldBody.height : 0)
                 Behavior on height { NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic } }
@@ -2501,6 +2508,10 @@ FloatingWindow {
                 // a row that is a picture, wide and with no control: the
                 // desk's Arrangement, or Surfaces' sample
                 readonly property bool sampleRow: settingRow.spec.type === "sample"
+                readonly property bool mapRow: settingRow.sampleRow && settingRow.spec.sample === "map"
+                // EDGE TO EDGE (user, 2026-10-29): first on its page, the map
+                // rises over the list's top margin to the window's edge
+                readonly property int mapLift: settingRow.mapRow && settingRow.index === 0 ? list.topMargin : 0
                 readonly property bool arrange: settingRow.spec.type === "arrange" || settingRow.sampleRow
 
                 // ── A ROW THAT FOLDS OPEN ────────────────────────────────
@@ -2656,12 +2667,27 @@ FloatingWindow {
                 }
 
                 SurfaceSample {
-                  visible: settingRow.sampleRow
+                  visible: settingRow.sampleRow && !settingRow.mapRow
                   x: popup.pad
                   // rowPad above and below, as every row has
                   y: settingRow.headH + popup.rowPad
                   width: parent.width - 2 * popup.pad - settingRow.gutter
                   height: popup.sampleH - 2 * popup.rowPad
+                }
+                // Time & date's map, by URL (no qmldir line, no restart):
+                // the whole list wide, under the scroll bar too
+                Loader {
+                  active: settingRow.mapRow
+                  y: settingRow.headH - settingRow.mapLift
+                  width: list.width
+                  height: popup.mapH
+                  source: "WorldMap.qml"
+                  onLoaded: {
+                    item.face = Qt.binding(() => popup.face);
+                    item.fgColor = Qt.binding(() => popup.fgColor);
+                    item.dimColor = Qt.binding(() => popup.dimColor);
+                    item.highlight = Qt.binding(() => popup.highlight);
+                  }
                 }
                 ArrangeView {
                   anchors.fill: parent
@@ -2687,7 +2713,10 @@ FloatingWindow {
                 readonly property bool moved: {
                   Oracle.revision;
                   // never a monitor's: see Oracle.changedIn
+                  // the time zone's rows are the computer's; only the network
+                  // clock has a default to go back to (sysDefault)
                   return settingRow.holds && !settingRow.spec.display
+                    && (!settingRow.spec.sysTime || settingRow.spec.sysDefault === true)
                     && (!Oracle.isDefault(settingRow.spec.key)
                         || Ora.alsoKeys(Oracle.spec(settingRow.spec.key) || settingRow.spec).some((k) => !Oracle.isDefault(k)));
                 }
@@ -2942,7 +2971,9 @@ FloatingWindow {
                           ink: parent ? parent.ink : popup.dimColor
                         }
                       }
-                      options: (settingRow.spec.options || []).map((o) => [o.value, o.label])
+                      // both sides as text: Segments matches by ===, and a
+                      // numeric choice (hyprland's 0/1/2) never equals "0"
+                      options: (settingRow.spec.options || []).map((o) => [String(o.value), o.label])
                       current: String(settingRow.live)
                       onChose: (v) => Oracle.set(settingRow.spec.key, v)
                     }

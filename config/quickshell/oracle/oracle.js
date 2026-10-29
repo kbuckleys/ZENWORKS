@@ -330,6 +330,8 @@ function display(spec, v) {
     const opts = spec.options || [];
     for (let i = 0; i < opts.length; ++i)
       if (opts[i].value === v) return opts[i].label;
+    // nothing chosen yet (a region picked, no city in it): what to do
+    if (v === "" && spec.emptyLabel) return spec.emptyLabel;
     // a monitor placed exactly, by the Arrangement view or by hand
     const at = parsePosition(v);
     if (at) return "Arranged \u00b7 " + at.x + ", " + at.y;
@@ -478,16 +480,49 @@ const PAGES = {
     ["Lock screen", ["lockHideCursor", "lockShade", "lockFrost", "lockFailLimit", "lockWidgetMonitor",
                      "lockClockSize", "lockDateSize", "lockFieldWidth"]]
   ],
+  // hyprland's own rows (HYPR_FIELDS, "hl:<name>") are added to their
+  // parts by hyprPlace, after what is listed here
   windows: [
     ["Gaps and borders", ["hyprGapsOut", "hyprGapsIn", "hyprSpecialGaps", "hyprBorder"]],
-    ["Tiling", ["hyprLayout", "hyprResizeBorder", "workspaceStrip"]],
-    // Keyboard & mouse's Keyboard focus here too (its alsoIn), with what
+    ["Resizing", ["hyprResizeBorder"]],
+    ["Snapping", []],
+    // Keyboard & mouse's Window focus here too (its alsoIn), with what
     // the windows it leaves look like
     ["Focus", ["input:follow_mouse", "hyprDimInactive", "hyprInactiveOpacity"]],
+    ["Terminal swallowing", []],
+    ["Apps not responding", []],
     ["Rules and startup", ["infoWindowRules", "infoStartup"]]
   ],
-  time: [
+  // the Windows page's tiling, and every layout's own (2026-10-29)
+  tiling: [
+    ["Layout", ["hyprLayout"]],
+    ["Dwindle", []],
+    ["Master", []],
+    ["Scrolling", []],
+    ["Window groups", []],
+    ["Tabs", []]
+  ],
+  workspaces: [
+    ["Switching", ["workspaceStrip"]],
+    ["Screens", []],
+    ["Layouts", []]
+  ],
+  wineffects: [
+    ["Blur", []],
+    ["Glass", []],
+    ["Shadow", []],
+    ["Glow", []],
+    ["Corners", []],
+    ["Motion blur", []]
+  ],
+  // the map first, under no heading (WorldMap.qml)
+  datetime: [
+    ["", ["timeMap"]],
+    ["Time zone", ["tz:region", "infoTimeNow"]],
     ["Clock", ["clock24h", "clockSeconds"]],
+    ["Setting the clock", ["tz:ntp", "tz:localRtc"]]
+  ],
+  time: [
     ["Weather", ["weatherEnabled", "weatherFahrenheit", "weatherRefreshMins", "weatherStaleMins"]],
     ["Calendar", ["calRemindLead", "calSyncMins"]]
   ],
@@ -1764,11 +1799,11 @@ const INPUT_FIELDS = [
   // focus
   // Click to focus by default (user, 2026-10-27: "disable focus on
   // hover"), and shown under Windows as well (alsoIn: one setting, two pages)
-  { key: "follow_mouse", group: "focus", def: 0, type: "enum", alsoIn: "windows",
-    options: [{ value: 0, label: "Click to focus" }, { value: 1, label: "Follows the pointer" },
+  { key: "follow_mouse", group: "focus", def: 0, type: "enum", segments: true, alsoIn: "windows",
+    options: [{ value: 0, label: "Click" }, { value: 1, label: "Follow pointer" },
               { value: 2, label: "Pointer only" }, { value: 3, label: "Separate" }],
-    label: "Keyboard focus", alias: "focus follows mouse pointer click hover",
-    help: "Follows the pointer: the window under it gets the keyboard. Pointer only: hovering sends the pointer there but the keyboard stays until you click. Separate: the keyboard never follows the pointer at all." },
+    label: "Window focus", alias: "window keyboard focus follows mouse pointer click hover",
+    help: "Click: a window is focused when you click it. Follow pointer: the window under the pointer gets the keyboard. Pointer only: hovering sends the pointer there but the keyboard stays until you click. Separate: the keyboard never follows the pointer at all." },
   { key: "follow_mouse_threshold", group: "focus", def: 0, type: "real", min: 0, max: 200, step: 1, unit: "px",
     label: "Pointer travel before focus", alias: "focus follow mouse threshold distance",
     help: "How far the pointer has to move before the window under it is focused." },
@@ -2495,6 +2530,574 @@ function renderEffectsLua(fx) {
    .concat(["}", ""]).join("\n");
 }
 
+// ── HYPRLAND ──
+// The rest of hyprland's own settings (user, 2026-10-29: "hyprland is an
+// integral part of the shell"): hypr/lua/hyprland.lua, one flat table of
+// `["section:key"] = value` by hyprland's own names, which base.lua lays
+// over everything it sets, each in its own call. Names, ranges and choices
+// are 0.57's (`hyprctl descriptions`); a default is base.lua's value where
+// it sets one, hyprland's where it does not, so a file of defaults changes
+// nothing. "" leaves a setting to hyprland.
+//
+// Two kinds are not hyprland settings but the shell's, and base.lua turns
+// them into calls: "zen:gesture:<fingers>:<direction>" is a touchpad
+// gesture (hl.gesture), "zen:ws:<n>:<field>" a workspace's rule
+// (hl.workspace_rule).
+//
+// `section` is the page, `part` the heading on it: a page laid out in PAGES
+// has the heading there (hyprPlace fills it in), and the others (input,
+// display) get a header row of their own (Oracle.hyprSpecs).
+const OPEN_FS = [{ value: 0, label: "Off" }, { value: 1, label: "On" }, { value: 2, label: "Forced" }];
+const AUTO3 = [{ value: 0, label: "Off" }, { value: 1, label: "On" }, { value: 2, label: "Automatic" }];
+
+const HYPR_FIELDS = [
+  // ── Windows ──
+  { key: "general:float_gaps", section: "windows", part: "Gaps and borders", def: 0, type: "int", min: 0, max: 40, step: 1, unit: "px",
+    label: "Floating gaps", alias: "floating window gaps edge margin",
+    help: "How far floating windows keep from the screen's edges. 0 lets them touch." },
+  { key: "general:gaps_workspaces", section: "windows", part: "Gaps and borders", def: 0, type: "int", min: 0, max: 100, step: 5, unit: "px",
+    label: "Gap between workspaces", alias: "workspace gap slide animation space",
+    help: "The space between one workspace and the next as they slide past each other." },
+  { key: "general:extend_border_grab_area", section: "windows", part: "Resizing", def: 15, type: "int", min: 0, max: 50, step: 1, unit: "px",
+    label: "Grab area", alias: "resize border grab edge area width",
+    help: "How far outside a window's edge a drag still resizes it, with Resize from edges on." },
+  { key: "general:hover_icon_on_border", section: "windows", part: "Resizing", def: true, type: "bool",
+    label: "Resize pointer on edges", alias: "resize cursor icon border hover",
+    help: "The pointer turns into a resize arrow over a window's edge, with Resize from edges on." },
+  { key: "general:resize_corner", section: "windows", part: "Resizing", def: 0, type: "enum", chipW: 208,
+    options: [{ value: 0, label: "Nearest" }, { value: 1, label: "Top left" }, { value: 2, label: "Top right" },
+              { value: 3, label: "Bottom right" }, { value: 4, label: "Bottom left" }],
+    label: "Floating resize corner", alias: "resize corner floating window super drag",
+    help: "Which corner of a floating window moves when you resize it with Super and the right button. Nearest is the one under the pointer." },
+  { key: "general:snap:enabled", section: "windows", part: "Snapping", def: true, type: "bool",
+    label: "Snap floating windows", alias: "snap magnet floating window edge align",
+    help: "A floating window dragged near another window or the screen's edge jumps flush against it." },
+  { key: "general:snap:window_gap", section: "windows", part: "Snapping", def: 10, type: "int", min: 0, max: 100, step: 1, unit: "px",
+    label: "Snap to windows from", alias: "snap distance window gap",
+    help: "How close to another window it has to come before it snaps." },
+  { key: "general:snap:monitor_gap", section: "windows", part: "Snapping", def: 10, type: "int", min: 0, max: 100, step: 1, unit: "px",
+    label: "Snap to edges from", alias: "snap distance screen edge monitor gap",
+    help: "How close to the screen's edge it has to come before it snaps." },
+  { key: "general:snap:border_overlap", section: "windows", part: "Snapping", def: true, type: "bool",
+    label: "Share one border", alias: "snap border overlap",
+    help: "Snapped windows overlap by a border, so one line stands between them, not two." },
+  { key: "general:snap:respect_gaps", section: "windows", part: "Snapping", def: false, type: "bool",
+    label: "Keep the gaps", alias: "snap respect gaps",
+    help: "Snapped windows stand the inner and outer gaps apart, as tiled ones do." },
+  { key: "decoration:active_opacity", section: "windows", part: "Focus", def: 1, type: "real", min: 0.5, max: 1, step: 0.05,
+    label: "Focused opacity", alias: "opacity transparent active focused window",
+    help: "How see-through the window you are in is. 1 is solid." },
+  { key: "decoration:fullscreen_opacity", section: "windows", part: "Focus", def: 1, type: "real", min: 0.5, max: 1, step: 0.05,
+    label: "Fullscreen opacity", alias: "opacity transparent fullscreen window",
+    help: "How see-through a fullscreen window is. 1 is solid." },
+  { key: "decoration:dim_special", section: "windows", part: "Focus", def: 0.8, type: "real", min: 0, max: 1, step: 0.05,
+    label: "Dim behind special workspace", alias: "dim special workspace scratchpad darken",
+    help: "How dark the rest of the screen goes while the special workspace is shown. 0 leaves it as it is." },
+  { key: "decoration:dim_modal", section: "windows", part: "Focus", def: true, type: "bool",
+    label: "Dim behind dialogs", alias: "dim modal dialog parent darken",
+    help: "A window waiting on one of its own dialogs is dimmed until the dialog closes." },
+  { key: "misc:focus_on_activate", section: "windows", part: "Focus", def: false, type: "bool",
+    label: "Apps may take focus", alias: "focus activate steal request app raise",
+    help: "An app that asks to be brought forward (a link opened in a browser behind) is focused at once. Off, it only asks." },
+  { key: "general:no_focus_fallback", section: "windows", part: "Focus", def: false, type: "bool",
+    label: "Stop at the last window", alias: "focus fallback direction edge move focus",
+    help: "Moving focus toward an edge with no window that way stays put, instead of going to the nearest window." },
+  { key: "misc:on_focus_under_fullscreen", section: "windows", part: "Focus", def: 2, type: "enum", chipW: 208,
+    options: [{ value: 0, label: "Stay behind" }, { value: 1, label: "Take over" }, { value: 2, label: "Leave fullscreen" }],
+    label: "Opening under fullscreen", alias: "fullscreen maximized new window focus under",
+    help: "What a new tiled window does while another fills the screen: wait behind it, take the fullscreen over, or end the fullscreen." },
+  { key: "misc:exit_window_retains_fullscreen", section: "windows", part: "Focus", def: 0, type: "enum", chipW: 208,
+    options: [{ value: 0, label: "No" }, { value: 1, label: "Yes" }, { value: 2, label: "Only in a group" }, { value: 3, label: "Only outside a group" }],
+    label: "Fullscreen passes on", alias: "fullscreen close next window retain",
+    help: "Closing a fullscreen window makes the window that gets the focus fullscreen too." },
+  { key: "misc:enable_swallow", section: "windows", part: "Terminal swallowing", def: false, type: "bool",
+    label: "Swallow from the terminal", alias: "swallow terminal hide launch window replace",
+    help: "A window started from a terminal takes the terminal's place, and the terminal comes back when it closes." },
+  { key: "misc:swallow_regex", section: "windows", part: "Terminal swallowing", def: "^(kitty)$", type: "text",
+    label: "Terminals", alias: "swallow regex terminal class",
+    help: "Which windows swallow, by app class, as a regular expression." },
+  { key: "misc:swallow_exception_regex", section: "windows", part: "Terminal swallowing", def: "", type: "text",
+    label: "Never swallowed", alias: "swallow exception regex title",
+    help: "Terminal titles that never swallow, as a regular expression: a terminal running an editor, say." },
+  { key: "misc:enable_anr_dialog", section: "windows", part: "Apps not responding", def: true, type: "bool",
+    label: "Ask about a frozen app", alias: "anr not responding hang frozen dialog kill",
+    help: "When an app stops answering, hyprland offers to wait or close it." },
+  { key: "misc:anr_missed_pings", section: "windows", part: "Apps not responding", def: 5, type: "int", min: 1, max: 20, step: 1,
+    label: "Ask after", unit: " pings", alias: "anr missed pings timeout",
+    help: "How many checks an app may miss before hyprland asks. Each is about a second." },
+
+  // ── Tiling ──
+  { key: "layout:single_window_aspect_ratio", section: "tiling", part: "Layout", def: "0 0", type: "enum", chipW: 208,
+    options: [{ value: "0 0", label: "Fill the screen" }, { value: "16 9", label: "16:9" }, { value: "16 10", label: "16:10" },
+              { value: "4 3", label: "4:3" }, { value: "1 1", label: "Square" }],
+    label: "A lone window's shape", alias: "single window aspect ratio ultrawide center lone",
+    help: "A workspace with one tiled window keeps it to this shape, centered, instead of stretching it edge to edge. For a wide screen." },
+  { key: "dwindle:preserve_split", section: "tiling", part: "Dwindle", def: true, type: "bool",
+    label: "Keep the split", alias: "dwindle preserve split direction",
+    help: "A split stays side by side or stacked as you resize, rather than turning with the space's shape." },
+  { key: "dwindle:smart_split", section: "tiling", part: "Dwindle", def: false, type: "bool",
+    label: "Split where the pointer is", alias: "dwindle smart split pointer mouse",
+    help: "A new window opens on the side of the focused one the pointer is nearest." },
+  { key: "dwindle:force_split", section: "tiling", part: "Dwindle", def: 0, type: "enum", segments: true,
+    options: [{ value: 0, label: "Follow pointer" }, { value: 1, label: "Left or top" }, { value: 2, label: "Right or bottom" }],
+    label: "New window goes", alias: "dwindle force split side new window",
+    help: "Which side of the split a new window takes." },
+  { key: "dwindle:default_split_ratio", section: "tiling", part: "Dwindle", def: 1, type: "real", min: 0.1, max: 1.9, step: 0.05,
+    label: "Split ratio", alias: "dwindle default split ratio size",
+    help: "How a split shares its space at first. 1 is half each; more gives the first window more." },
+  { key: "dwindle:split_width_multiplier", section: "tiling", part: "Dwindle", def: 1, type: "real", min: 0.1, max: 3, step: 0.1,
+    label: "Side-by-side bias", alias: "dwindle split width multiplier",
+    help: "Above 1, spaces split side by side more often; below, stacked more often." },
+  { key: "dwindle:smart_resizing", section: "tiling", part: "Dwindle", def: true, type: "bool",
+    label: "Resize toward the pointer", alias: "dwindle smart resizing mouse",
+    help: "Resizing with the mouse moves the edge nearest the pointer." },
+  // dwindle:special_scale_factor left out: deprecated in 0.57 ("use
+  // workspace rules"), and Health's Hyprland config row lists it
+  { key: "master:mfact", section: "tiling", part: "Master", def: 0.55, type: "real", min: 0.1, max: 0.9, step: 0.05,
+    label: "Master size", alias: "master mfact size ratio",
+    help: "How much of the screen the master window takes." },
+  { key: "master:orientation", section: "tiling", part: "Master", def: "left", type: "enum", chipW: 208,
+    options: [{ value: "left", label: "Left" }, { value: "right", label: "Right" }, { value: "top", label: "Top" },
+              { value: "bottom", label: "Bottom" }, { value: "center", label: "Center" }],
+    label: "Master side", alias: "master orientation side center",
+    help: "Where the master window sits; Center puts the stack on both sides of it." },
+  { key: "master:new_status", section: "tiling", part: "Master", def: "slave", type: "enum", segments: true,
+    options: [{ value: "slave", label: "Stack" }, { value: "master", label: "Master" }, { value: "inherit", label: "Like focused" }],
+    label: "New windows join", alias: "master new status stack",
+    help: "Whether a new window joins the stack, becomes the master, or goes where the focused window is." },
+  { key: "master:new_on_top", section: "tiling", part: "Master", def: false, type: "bool",
+    label: "New on top of the stack", alias: "master new on top",
+    help: "A new window goes to the top of the stack instead of the bottom." },
+  { key: "master:new_on_active", section: "tiling", part: "Master", def: "none", type: "enum", segments: true,
+    options: [{ value: "none", label: "Off" }, { value: "before", label: "Before" }, { value: "after", label: "After" }],
+    label: "Next to the focused", alias: "master new on active before after",
+    help: "A new window goes just before or after the focused one, not at the end." },
+  { key: "master:slave_count_for_center_master", section: "tiling", part: "Master", def: 2, type: "int", min: 0, max: 10, step: 1,
+    label: "Center from", unit: " windows", alias: "master center slave count",
+    help: "With Center, how many stacked windows there must be before the master moves to the middle." },
+  { key: "master:focus_master_on_close", section: "tiling", part: "Master", def: false, type: "bool",
+    label: "Focus the master on close", alias: "master focus close",
+    help: "Closing a window focuses the master." },
+  { key: "master:always_keep_position", section: "tiling", part: "Master", def: false, type: "bool",
+    label: "Master keeps its place", alias: "master keep position alone",
+    help: "A master with no stack beside it stays where Master side puts it, instead of filling the screen." },
+  { key: "scrolling:column_width", section: "tiling", part: "Scrolling", def: 0.95, type: "real", min: 0.1, max: 1, step: 0.05,
+    label: "Column width", alias: "scrolling column width size",
+    help: "How much of the screen a new column takes." },
+  { key: "scrolling:focus_fit_method", section: "tiling", part: "Scrolling", def: 0, type: "enum", segments: true,
+    options: [{ value: 0, label: "Center" }, { value: 1, label: "Just fit" }],
+    label: "Bring into view", alias: "scrolling focus fit center",
+    help: "A column focused off screen scrolls to the middle, or only far enough to fit." },
+  { key: "scrolling:follow_focus", section: "tiling", part: "Scrolling", def: 1, type: "enum", segments: true,
+    options: [{ value: 0, label: "Stay put" }, { value: 1, label: "Follow" }],
+    label: "Follow the focus", alias: "scrolling follow focus",
+    help: "The strip scrolls to whichever window gets the focus." },
+  { key: "scrolling:direction", section: "tiling", part: "Scrolling", def: "right", type: "enum", segments: true,
+    options: [{ value: "right", label: "Right" }, { value: "left", label: "Left" }, { value: "down", label: "Down" }, { value: "up", label: "Up" }],
+    label: "New columns go", alias: "scrolling direction",
+    help: "The way the strip grows as windows open." },
+  { key: "scrolling:fullscreen_on_one_column", section: "tiling", part: "Scrolling", def: true, type: "bool",
+    label: "One column fills the screen", alias: "scrolling single column fullscreen",
+    help: "A workspace with one column spreads it across the whole screen." },
+  { key: "scrolling:wrap_focus", section: "tiling", part: "Scrolling", def: true, type: "bool",
+    label: "Wrap around", alias: "scrolling wrap focus",
+    help: "Moving focus past the last column comes round to the first." },
+  { key: "scrolling:explicit_column_widths", section: "tiling", part: "Scrolling", def: "0.333, 0.5, 0.667, 1.0", type: "text",
+    label: "Column width steps", alias: "scrolling explicit column widths resize presets",
+    help: "The widths the column resize binds step through, as fractions of the screen, comma-separated." },
+  { key: "group:auto_group", section: "tiling", part: "Window groups", def: true, type: "bool",
+    label: "New windows join the group", alias: "group tabbed auto",
+    help: "A window opened while a group is focused becomes a tab in it." },
+  { key: "group:insert_after_current", section: "tiling", part: "Window groups", def: true, type: "bool",
+    label: "Next to the current tab", alias: "group insert after current",
+    help: "A new tab opens beside the one you are in, not at the end." },
+  { key: "group:focus_removed_window", section: "tiling", part: "Window groups", def: true, type: "bool",
+    label: "Follow a tab taken out", alias: "group focus removed window",
+    help: "A window moved out of its group keeps the focus." },
+  { key: "group:drag_into_group", section: "tiling", part: "Window groups", def: 1, type: "enum", segments: true,
+    options: [{ value: 0, label: "Never" }, { value: 1, label: "Anywhere" }, { value: 2, label: "On the tabs" }],
+    label: "Drop into a group", alias: "group drag drop merge",
+    help: "Where a window dragged onto a group has to land to join it." },
+  { key: "group:group_on_movetoworkspace", section: "tiling", part: "Window groups", def: false, type: "bool",
+    label: "Join on moving", alias: "group move to workspace merge",
+    help: "A window sent to a workspace with a group joins that group." },
+  { key: "group:groupbar:enabled", section: "tiling", part: "Tabs", def: true, type: "bool",
+    label: "Show the tabs", alias: "groupbar tabs bar",
+    help: "A strip of tabs above a group, one for each window in it." },
+  { key: "group:groupbar:disable_when_only", section: "tiling", part: "Tabs", def: false, type: "bool",
+    label: "Hide with one tab", alias: "groupbar single hide",
+    help: "A group of one window shows no tab." },
+  { key: "group:groupbar:height", section: "tiling", part: "Tabs", def: 24, type: "int", min: 8, max: 48, step: 1, unit: "px",
+    label: "Tab height", alias: "groupbar height size",
+    help: "How tall the tabs are." },
+  { key: "group:groupbar:render_titles", section: "tiling", part: "Tabs", def: true, type: "bool",
+    label: "Titles on tabs", alias: "groupbar titles text",
+    help: "Each tab shows its window's title." },
+  { key: "group:groupbar:stacked", section: "tiling", part: "Tabs", def: false, type: "bool",
+    label: "Stack the tabs", alias: "groupbar stacked vertical",
+    help: "The tabs sit one above another instead of side by side." },
+  { key: "group:groupbar:gradients", section: "tiling", part: "Tabs", def: true, type: "bool",
+    label: "Filled tabs", alias: "groupbar gradients fill",
+    help: "Each tab is filled with the theme's color. Off, only the titles show." },
+  { key: "group:groupbar:blur", section: "tiling", part: "Tabs", def: false, type: "bool",
+    label: "Frost the tabs", alias: "groupbar blur frost",
+    help: "What is behind the tabs is blurred." },
+  { key: "group:groupbar:scrolling", section: "tiling", part: "Tabs", def: true, type: "bool",
+    label: "Scroll to switch", alias: "groupbar scroll switch",
+    help: "Scrolling over the tabs moves to the next or previous one." },
+  { key: "group:groupbar:middle_click_close", section: "tiling", part: "Tabs", def: true, type: "bool",
+    label: "Middle-click closes", alias: "groupbar middle click close",
+    help: "A middle click on a tab closes its window." },
+
+  // ── Workspaces ──
+  { key: "binds:workspace_back_and_forth", section: "workspaces", part: "Switching", def: 0, type: "enum", segments: true,
+    options: [{ value: 0, label: "Off" }, { value: 1, label: "On" }, { value: 2, label: "Per screen" }],
+    label: "Back and forth", alias: "workspace back and forth previous toggle",
+    help: "Asking for the workspace you are on goes back to the one before it." },
+  { key: "binds:allow_workspace_cycles", section: "workspaces", part: "Switching", def: false, type: "bool",
+    label: "Remember the way back", alias: "workspace cycles previous history",
+    help: "Going back to the previous workspace keeps going back, one step at a time, instead of toggling between two." },
+  { key: "binds:hide_special_on_workspace_change", section: "workspaces", part: "Switching", def: true, type: "bool",
+    label: "Hide special on switch", alias: "special workspace hide switch",
+    help: "Switching workspace puts the special workspace away." },
+  { key: "misc:close_special_on_empty", section: "workspaces", part: "Switching", def: true, type: "bool",
+    label: "Close special when empty", alias: "special workspace close empty",
+    help: "The special workspace goes away when its last window closes." },
+  { key: "misc:initial_workspace_tracking", section: "workspaces", part: "Switching", def: 0, type: "enum", segments: true,
+    options: [{ value: 0, label: "Off" }, { value: 1, label: "First window" }, { value: 2, label: "Every window" }],
+    label: "Open where started", alias: "initial workspace tracking launch open",
+    help: "An app started on one workspace opens there, even if you have moved on by the time it shows." },
+
+  // ── Window effects ──
+  { key: "decoration:blur:enabled", section: "wineffects", part: "Blur", def: true, type: "bool",
+    label: "Blur", alias: "blur frost background behind window",
+    help: "What is behind a see-through window, panel or menu is blurred. Off, it shows through sharp." },
+  { key: "decoration:blur:size", section: "wineffects", part: "Blur", def: 8, type: "int", min: 1, max: 30, step: 1,
+    label: "Blur size", alias: "blur size radius strength",
+    help: "How far each pass spreads. More is softer." },
+  { key: "decoration:blur:passes", section: "wineffects", part: "Blur", def: 2, type: "int", min: 1, max: 6, step: 1,
+    label: "Blur passes", alias: "blur passes quality",
+    help: "How many times the blur is run. More is smoother and costs the graphics card more." },
+  { key: "decoration:blur:noise", section: "wineffects", part: "Blur", def: 0.0117, type: "real", min: 0, max: 0.2, step: 0.0001,
+    label: "Grain", alias: "blur noise grain",
+    help: "A fine grain over the blur, so it does not band." },
+  { key: "decoration:blur:contrast", section: "wineffects", part: "Blur", def: 0.8916, type: "real", min: 0, max: 2, step: 0.0001,
+    label: "Contrast", alias: "blur contrast",
+    help: "The blur's contrast. 1 leaves it as it is." },
+  { key: "decoration:blur:brightness", section: "wineffects", part: "Blur", def: 1, type: "real", min: 0, max: 2, step: 0.05,
+    label: "Brightness", alias: "blur brightness",
+    help: "The blur's brightness. 1 leaves it as it is." },
+  { key: "decoration:blur:vibrancy", section: "wineffects", part: "Blur", def: 0.1696, type: "real", min: 0, max: 1, step: 0.0001,
+    label: "Vibrancy", alias: "blur vibrancy saturation color",
+    help: "How much richer the colors behind come through." },
+  { key: "decoration:blur:vibrancy_darkness", section: "wineffects", part: "Blur", def: 0, type: "real", min: 0, max: 1, step: 0.05,
+    label: "Vibrancy in the dark", alias: "blur vibrancy darkness",
+    help: "How much of the vibrancy reaches dark colors." },
+  { key: "decoration:blur:xray", section: "wineffects", part: "Blur", def: false, type: "bool",
+    label: "See through to the background", alias: "blur xray floating",
+    help: "Floating windows blur only the background, not the tiled windows under them." },
+  { key: "decoration:blur:ignore_opacity", section: "wineffects", part: "Blur", def: true, type: "bool",
+    label: "Full blur under see-through", alias: "blur ignore opacity",
+    help: "A see-through window gets the whole blur however see-through it is. Off, the blur thins with it." },
+  { key: "decoration:blur:special", section: "wineffects", part: "Blur", def: true, type: "bool",
+    label: "Blur behind special workspace", alias: "blur special workspace",
+    help: "The screen behind the special workspace is blurred. Costs the graphics card." },
+  { key: "decoration:blur:popups", section: "wineffects", part: "Blur", def: true, type: "bool",
+    label: "Blur under app menus", alias: "blur popups menus right-click",
+    help: "The right-click menus and dropdowns of apps are frosted too." },
+  { key: "decoration:blur:input_methods", section: "wineffects", part: "Blur", def: false, type: "bool",
+    label: "Blur under input methods", alias: "blur input method fcitx candidate",
+    help: "The input method's box of candidates (fcitx5) is frosted too." },
+  { key: "decoration:blur:glass:refraction", section: "wineffects", part: "Glass", def: 20, type: "int", min: 0, max: 20, step: 1, unit: "px",
+    label: "Refraction", alias: "glass refraction bend",
+    help: "How far the glass styles of Frost style bend what is behind them." },
+  { key: "decoration:blur:glass:size", section: "wineffects", part: "Glass", def: 40, type: "int", min: 4, max: 512, step: 4, unit: "px",
+    label: "Pattern size", alias: "glass pattern size",
+    help: "How large the glass's pattern is." },
+  { key: "decoration:blur:glass:roughness", section: "wineffects", part: "Glass", def: 1, type: "real", min: 0, max: 1, step: 0.05,
+    label: "Roughness", alias: "glass roughness relief",
+    help: "How strongly the glass's relief is shaded." },
+  { key: "decoration:shadow:range", section: "wineffects", part: "Shadow", def: 70, type: "int", min: 0, max: 100, step: 1, unit: "px",
+    label: "Shadow reach", alias: "shadow range size",
+    help: "How far a window's shadow spreads, with Window shadows on." },
+  { key: "decoration:shadow:render_power", section: "wineffects", part: "Shadow", def: 2, type: "int", min: 1, max: 4, step: 1,
+    label: "Shadow falloff", alias: "shadow render power falloff",
+    help: "How quickly the shadow fades. More is tighter." },
+  { key: "decoration:shadow:sharp", section: "wineffects", part: "Shadow", def: false, type: "bool",
+    label: "Hard shadow", alias: "shadow sharp hard",
+    help: "The shadow has a hard edge instead of fading." },
+  { key: "decoration:shadow:offset", section: "wineffects", part: "Shadow", def: "0 10", type: "text",
+    label: "Shadow offset", alias: "shadow offset position",
+    help: "How far the shadow is moved, in pixels: across then down, such as 0 10." },
+  { key: "decoration:shadow:scale", section: "wineffects", part: "Shadow", def: 1, type: "real", min: 0.5, max: 1.5, step: 0.05,
+    label: "Shadow scale", alias: "shadow scale size",
+    help: "The shadow's size against its window's." },
+  { key: "decoration:glow:enabled", section: "wineffects", part: "Glow", def: false, type: "bool",
+    label: "Inner glow", alias: "glow inner light edge",
+    help: "A soft light along the inside of every window's edge." },
+  { key: "decoration:glow:range", section: "wineffects", part: "Glow", def: 10, type: "int", min: 0, max: 100, step: 1, unit: "px",
+    label: "Glow reach", alias: "glow range size",
+    help: "How far in from the edge the glow reaches." },
+  { key: "decoration:glow:render_power", section: "wineffects", part: "Glow", def: 3, type: "int", min: 1, max: 4, step: 1,
+    label: "Glow falloff", alias: "glow render power falloff",
+    help: "How quickly the glow fades. More is tighter." },
+  { key: "decoration:glow:color", section: "wineffects", part: "Glow", def: "", type: "color",
+    label: "Glow color", alias: "glow color",
+    help: "The glow's color. Unset, hyprland's own cyan." },
+  { key: "decoration:rounding_power", section: "wineffects", part: "Corners", def: 2, type: "real", min: 1, max: 10, step: 0.5,
+    label: "Corner shape", alias: "rounding power squircle corner shape",
+    help: "2 rounds a window's corners as circles; more gives the smoother squircle macOS uses. Corner rounding sets how big they are." },
+  { key: "decoration:border_part_of_window", section: "wineffects", part: "Corners", def: true, type: "bool",
+    label: "Border inside the window", alias: "border part of window",
+    help: "The border counts as part of the window, so rounding and the shadow go round it." },
+  { key: "decoration:motion_blur:enabled", section: "wineffects", part: "Motion blur", def: false, type: "bool",
+    label: "Motion blur", alias: "motion blur moving window drag",
+    help: "A window being moved or resized smears a little behind it. Costs the graphics card." },
+  { key: "decoration:motion_blur:samples", section: "wineffects", part: "Motion blur", def: 7, type: "int", min: 1, max: 32, step: 1,
+    label: "Motion blur quality", alias: "motion blur samples",
+    help: "How many steps the smear is drawn in. More is smoother and costs more." },
+
+  // ── Motion ──
+  { key: "animations:workspace_wraparound", section: "motion", part: "Animations", def: false, type: "bool",
+    label: "Wrap the workspace slide", alias: "workspace wraparound slide first last",
+    help: "Going from the last workspace to the first slides on the same way, instead of back across them all." },
+  { key: "misc:animate_manual_resizes", section: "motion", part: "Animations", def: false, type: "bool",
+    label: "Animate resizing", alias: "animate manual resize",
+    help: "A window resized by hand eases to its new size instead of following at once." },
+  { key: "misc:animate_mouse_windowdragging", section: "motion", part: "Animations", def: false, type: "bool",
+    label: "Animate dragging", alias: "animate mouse window dragging",
+    help: "A window dragged with the mouse trails a little behind the pointer." },
+
+  // ── Keyboard & mouse: the pointer and gestures ──
+  { key: "cursor:inactive_timeout", section: "input", part: "Pointer", def: 0, type: "int", min: 0, max: 20, step: 1, unit: "s",
+    label: "Hide when still", alias: "cursor hide inactive timeout idle pointer",
+    help: "The pointer hides after this long without moving. 0 never hides it." },
+  { key: "cursor:hide_on_key_press", section: "input", part: "Pointer", def: false, type: "bool",
+    label: "Hide while typing", alias: "cursor hide key press typing",
+    help: "The pointer hides on a key press and comes back when the mouse moves." },
+  { key: "cursor:hide_on_touch", section: "input", part: "Pointer", def: true, type: "bool",
+    label: "Hide on touch", alias: "cursor hide touch screen",
+    help: "The pointer hides while you use a touch screen." },
+  { key: "cursor:hide_on_tablet", section: "input", part: "Pointer", def: false, type: "bool",
+    label: "Hide on the pen", alias: "cursor hide tablet pen",
+    help: "The pointer hides while you use a drawing tablet." },
+  { key: "cursor:no_warps", section: "input", part: "Pointer", def: false, type: "bool",
+    label: "Never move the pointer", alias: "cursor no warps jump move",
+    help: "Hyprland never moves the pointer for you, whatever the settings below say." },
+  { key: "cursor:warp_on_change_workspace", section: "input", part: "Pointer", def: 0, type: "enum", segments: true, options: OPEN_FS,
+    label: "Jump on workspace switch", alias: "cursor warp workspace change",
+    help: "The pointer jumps to the focused window when the workspace changes. Forced does it even over a window that does not move." },
+  { key: "cursor:warp_on_toggle_special", section: "input", part: "Pointer", def: 0, type: "enum", segments: true, options: OPEN_FS,
+    label: "Jump on special workspace", alias: "cursor warp special toggle",
+    help: "The pointer jumps to the focused window when the special workspace is shown or put away." },
+  { key: "cursor:persistent_warps", section: "input", part: "Pointer", def: false, type: "bool",
+    label: "Back where it was", alias: "cursor persistent warps",
+    help: "A jump to a window puts the pointer back where it last was in it, not in its middle." },
+  { key: "misc:mouse_move_focuses_monitor", section: "input", part: "Pointer", def: true, type: "bool",
+    label: "Pointer picks the screen", alias: "mouse move focus monitor screen",
+    help: "Moving the pointer onto another screen makes it the focused one." },
+  { key: "misc:middle_click_paste", section: "input", part: "Pointer", def: false, type: "bool",
+    label: "Middle-click paste", alias: "middle click paste primary selection",
+    help: "Selecting text copies it to a second clipboard, and a middle click pastes it, as on older Linux desktops." },
+  { key: "zen:gesture:3:horizontal", section: "input", part: "Gestures", def: "workspace", type: "enum", chipW: 208, options: "gestures",
+    label: "Three fingers sideways", alias: "gesture swipe three fingers horizontal touchpad",
+    help: "What a three-finger swipe left or right does on a touchpad." },
+  { key: "zen:gesture:3:up", section: "input", part: "Gestures", def: "", type: "enum", chipW: 208, options: "gestures",
+    label: "Three fingers up", alias: "gesture swipe three fingers up touchpad", help: "What a three-finger swipe up does." },
+  { key: "zen:gesture:3:down", section: "input", part: "Gestures", def: "", type: "enum", chipW: 208, options: "gestures",
+    label: "Three fingers down", alias: "gesture swipe three fingers down touchpad", help: "What a three-finger swipe down does." },
+  { key: "zen:gesture:4:horizontal", section: "input", part: "Gestures", def: "", type: "enum", chipW: 208, options: "gestures",
+    label: "Four fingers sideways", alias: "gesture swipe four fingers horizontal touchpad", help: "What a four-finger swipe left or right does." },
+  { key: "zen:gesture:4:up", section: "input", part: "Gestures", def: "", type: "enum", chipW: 208, options: "gestures",
+    label: "Four fingers up", alias: "gesture swipe four fingers up touchpad", help: "What a four-finger swipe up does." },
+  { key: "zen:gesture:4:down", section: "input", part: "Gestures", def: "", type: "enum", chipW: 208, options: "gestures",
+    label: "Four fingers down", alias: "gesture swipe four fingers down touchpad", help: "What a four-finger swipe down does." },
+  { key: "zen:gesture:3:pinchin", section: "input", part: "Gestures", def: "", type: "enum", chipW: 208, options: "gestures",
+    label: "Three-finger pinch in", alias: "gesture pinch in three fingers touchpad", help: "What pinching three fingers together does." },
+  { key: "zen:gesture:3:pinchout", section: "input", part: "Gestures", def: "", type: "enum", chipW: 208, options: "gestures",
+    label: "Three-finger pinch out", alias: "gesture pinch out three fingers touchpad", help: "What spreading three fingers apart does." },
+  { key: "gestures:workspace_swipe_distance", section: "input", part: "Gestures", def: 300, type: "int", min: 50, max: 2000, step: 50, unit: "px",
+    label: "Swipe length", alias: "gesture workspace swipe distance",
+    help: "How far a workspace swipe travels for one whole workspace." },
+  { key: "gestures:workspace_swipe_invert", section: "input", part: "Gestures", def: true, type: "bool",
+    label: "Content follows the fingers", alias: "gesture workspace swipe invert natural",
+    help: "The workspaces move with your fingers, as on macOS. Off, they move against them." },
+  { key: "gestures:workspace_swipe_cancel_ratio", section: "input", part: "Gestures", def: 0.5, type: "real", min: 0.1, max: 0.9, step: 0.05,
+    label: "Swipe must go", alias: "gesture swipe cancel ratio",
+    help: "How much of the way a slow swipe has to go before it switches, rather than springing back." },
+  { key: "gestures:workspace_swipe_create_new", section: "input", part: "Gestures", def: true, type: "bool",
+    label: "Swipe past the last for a new one", alias: "gesture swipe create new workspace",
+    help: "Swiping on from the last workspace opens an empty one." },
+  { key: "gestures:workspace_swipe_forever", section: "input", part: "Gestures", def: false, type: "bool",
+    label: "Swipe across many", alias: "gesture swipe forever",
+    help: "One long swipe carries on past the next workspace, instead of stopping at it." },
+  { key: "gestures:workspace_swipe_touch", section: "input", part: "Gestures", def: false, type: "bool",
+    label: "Swipe from a touch screen's edge", alias: "gesture touch screen edge swipe",
+    help: "A swipe in from the edge of a touch screen switches workspace too." },
+
+  // ── Display ──
+  { key: "misc:vrr", section: "display", part: "Smoothness", def: 0, type: "enum", chipW: 208,
+    options: [{ value: 0, label: "Off" }, { value: 1, label: "Always" }, { value: 2, label: "Fullscreen" }, { value: 3, label: "Fullscreen games" }],
+    label: "Adaptive sync", alias: "vrr adaptive sync freesync gsync variable refresh",
+    help: "The screen's refresh follows what is drawn (FreeSync, G-Sync), for smoother games and video. Only on a screen that has it; some flicker with it always on." },
+  { key: "general:allow_tearing", section: "display", part: "Smoothness", def: false, type: "bool",
+    label: "Allow tearing", alias: "tearing immediate games latency",
+    help: "Games that ask for it may draw straight to the screen, for less lag at the cost of torn frames. A window rule picks which (Immediate)." },
+  { key: "render:direct_scanout", section: "display", part: "Smoothness", def: 0, type: "enum", segments: true, options: AUTO3.slice(0, 2).concat([{ value: 2, label: "Games" }]),
+    label: "Direct scanout", alias: "direct scanout fullscreen latency",
+    help: "A fullscreen window goes to the screen without being drawn again, for less lag. Some apps glitch with it." },
+  { key: "misc:render_unfocused_fps", section: "display", part: "Smoothness", def: 15, type: "int", min: 1, max: 120, step: 1, unit: " fps",
+    label: "Hidden windows draw at", alias: "render unfocused fps background",
+    help: "How often a window kept drawing while out of sight (a window rule) is drawn." },
+  { key: "render:cm_enabled", section: "display", part: "Color", def: true, type: "bool",
+    label: "Color management", alias: "color management cm hdr wide gamut",
+    help: "Hyprland handles colors for wide-gamut and HDR screens. Counts fully from the next login." },
+  { key: "render:cm_auto_hdr", section: "display", part: "Color", def: 1, type: "enum", segments: true,
+    options: [{ value: 0, label: "Off" }, { value: 1, label: "HDR" }, { value: 2, label: "HDR, screen's own" }],
+    label: "HDR for fullscreen", alias: "hdr auto fullscreen game video",
+    help: "A fullscreen app showing HDR switches the screen into HDR while it is up." },
+  { key: "xwayland:force_zero_scaling", section: "display", part: "Older apps", def: false, type: "bool",
+    label: "Sharp X apps on scaled screens", alias: "xwayland zero scaling blurry",
+    help: "Apps under XWayland are drawn at the screen's real size instead of stretched, so they are sharp but small." },
+  { key: "xwayland:use_nearest_neighbor", section: "display", part: "Older apps", def: false, type: "bool",
+    label: "Pixelated stretching", alias: "xwayland nearest neighbor pixelated",
+    help: "X apps stretched for a scaled screen keep hard pixels instead of going soft." },
+];
+
+// a gesture slot's actions (hl.gesture's own names; "" none)
+const GESTURE_ACTIONS = [
+  { value: "", label: "Nothing" }, { value: "workspace", label: "Switch workspace" },
+  { value: "special", label: "Special workspace" }, { value: "move", label: "Move the window" },
+  { value: "resize", label: "Resize the window" }, { value: "close", label: "Close the window" },
+  { value: "fullscreen", label: "Fullscreen" }, { value: "float", label: "Float or tile" },
+];
+
+// a workspace's own rule, for workspaces 1–10: its screen and its layout
+const WS_COUNT = 10;
+for (let n = 1; n <= WS_COUNT; ++n) {
+  HYPR_FIELDS.push({ key: "zen:ws:" + n + ":monitor", section: "workspaces", part: "Screens", def: "", type: "enum",
+    open: true, segments: true, options: "wsScreens", label: "Workspace " + n,
+    alias: "workspace " + n + " monitor screen output bind",
+    help: n === 1 ? "The screen each workspace lives on. Any lets it open wherever you are." : "" });
+}
+for (let n = 1; n <= WS_COUNT; ++n) {
+  HYPR_FIELDS.push({ key: "zen:ws:" + n + ":layout", section: "workspaces", part: "Layouts", def: "", type: "enum",
+    segments: true, art: "layout", label: "Workspace " + n, alias: "workspace " + n + " layout tiling dwindle master scrolling",
+    options: [{ value: "", label: "Same as Tiling" }, { value: "dwindle", label: "Dwindle" },
+              { value: "master", label: "Master" }, { value: "scrolling", label: "Scrolling" }],
+    help: n === 1 ? "A layout of a workspace's own. The empty screen is the same as Tiling's layout." : "" });
+}
+
+function hyprFields() { return HYPR_FIELDS; }
+function hyprKeys() { return HYPR_FIELDS.map((f) => f.key); }
+function hyprDefault(key) {
+  for (const f of HYPR_FIELDS) if (f.key === key) return f.def;
+  return undefined;
+}
+function hyprOptions(name, screens) {
+  if (name === "gestures") return GESTURE_ACTIONS;
+  if (name === "wsScreens") return [{ value: "", label: "Any" }].concat((screens || []).map((n) => ({ value: n, label: n })));
+  return [];
+}
+
+// Each field's key into its page's part in PAGES, in HYPR_FIELDS' order
+// after the part's own; a part PAGES does not name is a mistake the tests
+// catch (it would be the end of the page, unheaded). Returns the misses.
+function hyprPlace(pages) {
+  const miss = [];
+  for (const f of HYPR_FIELDS) {
+    const page = pages[f.section];
+    if (!page) continue;
+    const part = page.find((p) => p[0] === f.part);
+    const k = "hl:" + f.key;
+    if (!part) miss.push(k);
+    else if (part[1].indexOf(k) < 0) part[1].push(k);
+  }
+  return miss;
+}
+
+// a field as a row's spec: its choices filled in, its default the fallback
+function hyprSpec(f, screens) {
+  const c = ({});
+  for (const k in f) if (["key", "part", "def"].indexOf(k) < 0) c[k] = f[k];
+  c.key = "hl:" + f.key;
+  c.hl = f.key;
+  c.fallback = f.def;
+  if (typeof f.options === "string") c.options = hyprOptions(f.options, screens);
+  return c;
+}
+// what a file says, each known field the kind it should be, the rest left out
+function hyprSanitize(raw) {
+  const out = ({});
+  for (const f of HYPR_FIELDS)
+    if (raw && f.key in raw) out[f.key] = coerce(hyprSpec(f, []), raw[f.key]);
+  return out;
+}
+
+// ["a:b"] = "text" | number | true | false, comments ignored; anything this
+// list does not know is kept as it was
+function parseHyprLua(text) {
+  const out = ({});
+  const src = stripLuaComments(String(text || ""));
+  const re = /\[\s*"([A-Za-z0-9_:.\-]+)"\s*\]\s*=\s*("((?:[^"\\]|\\.)*)"|-?\d+(?:\.\d+)?|true|false)/g;
+  let m;
+  while ((m = re.exec(src)) !== null) {
+    const raw = m[2];
+    out[m[1]] = m[3] !== undefined ? m[3].replace(/\\(.)/g, "$1")
+      : raw === "true" ? true : raw === "false" ? false : Number(raw);
+  }
+  return out;
+}
+
+// every field, under its page's name, then what was written by hand; with
+// `known` only the fields (an import: nothing the list does not know)
+function renderHyprLua(values, known) {
+  const v = values || ({});
+  const keys = hyprKeys();
+  const width = Math.max.apply(null, keys.map((k) => k.length + 4));
+  const line = (k, val) => {
+    const lhs = "[\"" + k + "\"]";
+    // four places: blur's noise and contrast are hyprland's to four
+    const r = typeof val === "number" ? String(Math.round(val * 10000) / 10000) : luaValue(val);
+    return "\t" + lhs + " ".repeat(Math.max(0, width - lhs.length)) + " = " + r + ",";
+  };
+  const lines = [
+    "-- ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐",
+    "-- ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐",
+    "-- └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘",
+    "-- https://github.com/kbuckleys/",
+    "",
+    "-- HYPRLAND",
+    "-- Written by oracle, and read back by it: change one there or here,",
+    "-- either way works. Each is hyprland's own setting by its own name",
+    "-- (`hyprctl descriptions`), and base.lua lays them over its own, one call",
+    "-- each. \"\" leaves a setting to hyprland; two numbers in a string, such",
+    "-- as \"0 10\", are a pair. zen:gesture:<fingers>:<direction> is a touchpad",
+    "-- gesture, and zen:ws:<n>:monitor / :layout a workspace's own rule.",
+    "",
+    "return {",
+  ];
+  let section = null;
+  for (const f of HYPR_FIELDS) {
+    if (f.section !== section) {
+      if (section !== null) lines.push("");
+      lines.push("\t-- " + f.section);
+      section = f.section;
+    }
+    lines.push(line(f.key, v[f.key] === undefined ? f.def : v[f.key]));
+  }
+  const extra = known ? [] : Object.keys(v).filter((k) => keys.indexOf(k) < 0).sort();
+  if (extra.length) {
+    lines.push("", "\t-- written by hand, and kept as it was");
+    for (const k of extra) lines.push(line(k, v[k]));
+  }
+  lines.push("}");
+  return lines.join("\n") + "\n";
+}
+
+// the pages laid out in PAGES get their parts' hyprland rows
+hyprPlace(PAGES);
+
 // ── RECORDS ──
 // windows.lua and startup.lua are each a list of flat tables — strings,
 // numbers, true/false, nothing nested — so they read like the config they
@@ -2976,13 +3579,14 @@ function chordTaken(chord, id, binds, values, live) {
 // by these relative paths, and nothing outside them is ever written back.
 const BUNDLE_FIXED = ["oracle.json", "hypr/keys.lua", "hypr/wake.lua", "hypr/effects.lua", "hypr/defaults.lua",
                       "hypr/input.lua", "hypr/inputmethod.lua", "hypr/windows.lua", "hypr/startup.lua",
-                      "hypr/monitors.lua"];
+                      "hypr/monitors.lua", "hypr/hyprland.lua"];
 const BUNDLE_WORDS = { "oracle.json": "Settings", "hypr/keys.lua": "Shortcuts", "hypr/wake.lua": "Wake by",
                        "hypr/effects.lua": "Window shadows and animations",
                        "hypr/defaults.lua": "Default apps", "hypr/input.lua": "Keyboard and mouse",
                        "hypr/inputmethod.lua": "Input methods",
                        "hypr/windows.lua": "Window rules", "hypr/startup.lua": "Startup apps",
-                       "hypr/monitors.lua": "Screen arrangement" };
+                       "hypr/monitors.lua": "Screen arrangement",
+                       "hypr/hyprland.lua": "Hyprland settings" };
 function bundlePathOk(rel) {
   const r = String(rel || "");
   return BUNDLE_FIXED.indexOf(r) >= 0 || /^themes\/[A-Za-z0-9][A-Za-z0-9_-]*\.json$/.test(r);
@@ -3043,6 +3647,8 @@ function sanitizeBundleFile(rel, text, binds) {
     case "hypr/wake.lua": return renderWakeLua(parseWakeLua(t));
     case "hypr/inputmethod.lua": return renderImLua(parseImLua(t));
     case "hypr/effects.lua": return renderEffectsLua(parseEffectsLua(t));
+    // only the fields, each the kind it should be
+    case "hypr/hyprland.lua": return renderHyprLua(hyprSanitize(parseHyprLua(t)), true);
     case "hypr/defaults.lua": return renderDefaultsLua(parseDefaultsLua(t));
     case "hypr/input.lua": {
       const v = parseInputLua(t);
@@ -3080,6 +3686,145 @@ function bundleCommands(files) {
       if (c !== "" && !(k === "sysmon" && (c === "zeus" || /\.desktop$/.test(c))))
         out.push({ what: named[k], command: c, off: false });
     }
+  }
+  return out;
+}
+
+// ── DATE & TIME (2026-10-29) ──────────────────────────────────────────────
+// The time zone, the network clock and the hardware clock are systemd's
+// (timedatectl), not oracle.json's; the world map under them is WorldMap.qml.
+
+// "+3003+03115" or "-0745+11036" (zone.tab's ±DDMM±DDDMM, seconds allowed)
+// as { lat, lon } in degrees, or null
+function parseIso6709(s) {
+  const m = /^([+-])(\d{2})(\d{2})(\d{2})?([+-])(\d{3})(\d{2})(\d{2})?$/.exec(String(s || ""));
+  if (!m) return null;
+  const deg = (sign, d, mi, se) => (sign === "-" ? -1 : 1) * (Number(d) + Number(mi) / 60 + Number(se || 0) / 3600);
+  return { lat: deg(m[1], m[2], m[3], m[4]), lon: deg(m[5], m[6], m[7], m[8]) };
+}
+
+// A zone's city as people say it: "America/Argentina/Buenos_Aires" is
+// "Buenos Aires (Argentina)"
+function zoneCity(zone) {
+  const parts = String(zone || "").split("/");
+  const city = parts[parts.length - 1].replace(/_/g, " ");
+  return parts.length > 2 ? city + " (" + parts.slice(1, -1).join(", ").replace(/_/g, " ") + ")" : city;
+}
+function zoneRegion(zone) {
+  const z = String(zone || "");
+  return z.indexOf("/") < 0 ? "Other" : z.split("/")[0];
+}
+
+// zone.tab (one row per country and zone) as
+// [{ zone, region, city, lat, lon }], by region then city. A zone two
+// countries share is listed once.
+function parseZoneTab(text) {
+  const out = [];
+  const seen = {};
+  for (const line of String(text || "").split("\n")) {
+    if (line === "" || line[0] === "#") continue;
+    const f = line.split("\t");
+    if (f.length < 3 || seen[f[2]]) continue;
+    const at = parseIso6709(f[1]);
+    if (!at) continue;
+    seen[f[2]] = true;
+    out.push({ zone: f[2], region: zoneRegion(f[2]), city: zoneCity(f[2]), lat: at.lat, lon: at.lon });
+  }
+  out.sort((a, b) => a.region < b.region ? -1 : a.region > b.region ? 1 : a.city < b.city ? -1 : a.city > b.city ? 1 : 0);
+  return out;
+}
+
+// the regions, for the Time zone row's first chip; the zone worn is always
+// among them, listed or not (UTC, Etc/GMT+3)
+function zoneRegionOptions(zones, worn) {
+  const out = [];
+  const seen = {};
+  for (const z of zones) if (!seen[z.region]) { seen[z.region] = true; out.push(z.region); }
+  const w = zoneRegion(worn);
+  if (worn && !seen[w]) out.push(w);
+  return out.map((r) => ({ value: r, label: r }));
+}
+// a region's cities, for the second chip
+function zoneCityOptions(zones, region, worn) {
+  const out = zones.filter((z) => z.region === region).map((z) => ({ value: z.zone, label: z.city }));
+  if (worn && zoneRegion(worn) === region && !out.some((o) => o.value === worn))
+    out.unshift({ value: worn, label: zoneCity(worn) });
+  return out;
+}
+
+// the zone whose city is nearest a point, by great circle; null in an empty list
+function nearestZone(zones, lat, lon) {
+  const r = Math.PI / 180;
+  let best = null, bestD = Infinity;
+  const sl = Math.sin(lat * r), cl = Math.cos(lat * r);
+  for (const z of zones) {
+    const d = -(sl * Math.sin(z.lat * r) + cl * Math.cos(z.lat * r) * Math.cos((z.lon - lon) * r));
+    if (d < bestD) { bestD = d; best = z; }
+  }
+  return best;
+}
+
+// `timedatectl show` as { zone, ntp, canNtp, synced, localRtc, abbrev }
+function parseTimedate(text) {
+  const kv = {};
+  for (const line of String(text || "").split("\n")) {
+    const i = line.indexOf("=");
+    if (i > 0) kv[line.slice(0, i)] = line.slice(i + 1).trim();
+  }
+  const yes = (k) => kv[k] === "yes";
+  // "Thu 2026-10-29 19:29:34 EEST": the zone's abbreviation is the last word
+  const t = String(kv.TimeUSec || "").split(" ");
+  return { zone: kv.Timezone || "", ntp: yes("NTP"), canNtp: yes("CanNTP"), synced: yes("NTPSynchronized"),
+           localRtc: yes("LocalRTC"), abbrev: t.length > 3 ? t[t.length - 1] : "" };
+}
+
+// minutes east of UTC as "UTC+3", "UTC−4:30", "UTC"
+function utcOffsetText(mins) {
+  const m = Math.round(Number(mins) || 0);
+  if (m === 0) return "UTC";
+  const a = Math.abs(m);
+  return "UTC" + (m < 0 ? "−" : "+") + Math.floor(a / 60) + (a % 60 ? ":" + String(a % 60).padStart(2, "0") : "");
+}
+
+// The point the sun stands straight over at a moment (ms since the epoch),
+// { lat, lon } in degrees: the almanac's low-precision formulae, good to a
+// fraction of a degree, which at a map's scale is under a pixel.
+function subsolar(ms) {
+  const r = Math.PI / 180;
+  const n = ms / 86400000 + 2440587.5 - 2451545.0;
+  const L = ((280.460 + 0.9856474 * n) % 360 + 360) % 360;
+  const g = ((357.528 + 0.9856003 * n) % 360 + 360) % 360 * r;
+  const lam = (L + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)) * r;
+  const eps = (23.439 - 0.0000004 * n) * r;
+  const dec = Math.asin(Math.sin(eps) * Math.sin(lam));
+  const ra = Math.atan2(Math.cos(eps) * Math.sin(lam), Math.cos(lam)) / r;
+  // the equation of time, in degrees of turn (4 minutes each)
+  let eot = L - ra;
+  eot = ((eot + 180) % 360 + 360) % 360 - 180;
+  const utcH = ((ms / 3600000) % 24 + 24) % 24;
+  let lon = -15 * (utcH - 12) - eot;
+  lon = ((lon + 180) % 360 + 360) % 360 - 180;
+  return { lat: dec / r, lon: lon };
+}
+
+// Down one meridian, the latitudes where the sun stands higher than `alt`
+// degrees (0 the horizon, −6 the end of civil twilight): a list of
+// [south, north] spans, empty in a polar night. Along a meridian the sun's
+// height is R·cos(lat − φ0), so each span is φ0 ± a, cut to the poles.
+function daySpans(lon, sun, alt) {
+  const r = Math.PI / 180;
+  const A = Math.sin(sun.lat * r), B = Math.cos(sun.lat * r) * Math.cos((lon - sun.lon) * r);
+  const R = Math.sqrt(A * A + B * B);
+  const s = Math.sin((alt || 0) * r);
+  if (R < 1e-9) return s < 0 ? [[-90, 90]] : [];
+  const c = s / R;
+  if (c >= 1) return [];
+  if (c <= -1) return [[-90, 90]];
+  const phi = Math.atan2(A, B) / r, a = Math.acos(c) / r;
+  const out = [];
+  for (const k of [-360, 0, 360]) {
+    const lo = Math.max(-90, phi - a + k), hi = Math.min(90, phi + a + k);
+    if (lo < hi) out.push([lo, hi]);
   }
   return out;
 }

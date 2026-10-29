@@ -5,6 +5,7 @@
 
 import QtQuick
 import "."
+import "helpers.js" as Helpers
 
 Item {
   id: root
@@ -96,8 +97,10 @@ Item {
     show: mouse.containsMouse
     // one trace per channel, in the same two inks the meter beside it uses
     series: root.connected
-      ? [{ values: root.downHistory, line: Sysmon.netDownInk },
-         { values: root.upHistory,   line: Sysmon.netUpInk }]
+      ? [{ values: root.downHistory, line: Sysmon.netDownInk,
+           peak: Sysmon.netDownRaw, format: Helpers.powFormat },
+         { values: root.upHistory,   line: Sysmon.netUpInk,
+           peak: Sysmon.netUpRaw, format: Helpers.powFormat }]
       : []
   }
 

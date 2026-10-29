@@ -161,5 +161,23 @@ module.exports = {
     t.ok("a warning the file already had does not block", old.ok);
     t.has("the draft path is quoted", P.reviewCommand("/home/b/my cache/draft"), "'/home/b/my cache/draft'");
     t.ok("every option has help", P.SCHEMA.every(s => s.help && s.label && s.group));
+
+    // ── paru.conf's minimum release age (paru 2.2.0) ─────────────────────
+    {
+    t.eq("ages as paru reads them", ["3d", "12h", "1w", "90m", "30s", "2", "", "7y", "d", "-1"].map(P.releaseAge),
+      [259200, 43200, 604800, 5400, 30, 172800, 0, 0, 0, 0]);
+    const pc = ["[options]", "PgpFetch", "Devel", "#MinimumReleaseAge = 3d", "#MinimumReleaseAgeExclude", "", "#[bin]"];
+    t.eq("off as shipped", P.paruAgeOf(pc).secs, 0);
+    t.eq("paru's devel suffixes when the file names none", P.paruAgeOf(pc).devel, P.PARU_DEVEL);
+    const on = P.setParuAge(pc, "1w");
+    t.eq("switched on in its own commented line", on[3], "MinimumReleaseAge = 1w");
+    t.eq("nothing else moved", on.filter((l, i) => l !== pc[i]).length, 1);
+    t.eq("read back", [P.paruAgeOf(on).raw, P.paruAgeOf(on).secs], ["1w", 604800]);
+    t.eq("off comments it out again", P.setParuAge(on, "")[3], "#MinimumReleaseAge = 1w");
+    const ex = P.paruAgeOf(["[options]", "MinimumReleaseAge = 2d", "MinimumReleaseAgeExclude = foo* bar",
+                            "DevelSuffixes = -git -nightly"]);
+    t.eq("exclusions and suffixes read", [ex.exclude, ex.devel], [["foo*", "bar"], ["-git", "-nightly"]]);
+    t.eq("an empty file gains [options]", P.setParuAge([], "3d"), ["[options]", "MinimumReleaseAge = 3d"]);
+    }
   }
 };

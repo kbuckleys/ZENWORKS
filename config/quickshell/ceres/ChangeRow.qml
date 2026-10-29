@@ -20,6 +20,10 @@ Item {
   property var u: null
   property string glyph: ""
   property color glyphInk: Zenon.blue
+  // A pending update: marked when paru's minimum release age holds it back
+  // (Ceres.held) — a full upgrade leaves it out until then.
+  property bool pending: false
+  readonly property real heldUntil: ch.pending && ch.u ? (Ceres.heldUntil[ch.u.name] || 0) : 0
   implicitHeight: 28
 
   Text {
@@ -71,7 +75,9 @@ Item {
     // bold; what stayed the same in the quieter ink. 3.130-1 → 3.131-1 reads
     // as a minor bump at a glance, 2.90.0-1 → 2.90.0-2 as a rebuild.
     readonly property int same: !ch.u || !ch.u.from ? 0 : Cer.versionSplit(ch.u.from, ch.u.to)
-    text: !ch.u ? "" : (ch.u.from
+    text: !ch.u ? "" : (ch.heldUntil > 0
+        ? "<font color='" + Zenon.yellow + "'>held till " + Cer.esc(Qt.formatDateTime(new Date(ch.heldUntil), "ddd d MMM, h:mm ap")) + "</font>  "
+        : "") + (ch.u.from
       ? "<font color='" + Ceres.ink.muted + "'>" + Cer.esc(ch.u.from) + "</font>  "
         + "<font color='" + Ceres.ink.arrow + "'>→</font>  "
         + "<font color='" + Zenon.accentKey + "'>" + Cer.esc(ch.u.to.slice(0, vers.same)) + "</font>"
